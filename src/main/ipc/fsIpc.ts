@@ -1,0 +1,221 @@
+import { ipcMain } from 'electron'
+import fs from 'fs-extra'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { getDirectories, getSha1, getTotalSizes } from '../utilities/files'
+import { ArgCheck, check, handleSafe, IpcArgumentError } from '../utilities/ipc'
+import { assertReadablePath, assertWritablePath } from '../utilities/safePath'
+import { writeJsonAtomic, writeJsonAtomicSync } from '../utilities/atomicJson'
+import { isExcludedInstancePath } from '@/shared/instancePrivacy'
+import { redactSecrets } from '@/shared/logSanitizer'
+import { ArchiveExtractProgress } from '@/types/Archive'
+import { sendProgress, throttleProgress } from '../utilities/progressEvents'
+
+type DirEntry = { path: string; type: 'folder' | 'file' }
+
+const MAX_PATH_LIST = 100000
+
+const isPath = check.nonEmptyString(4096)
+const isPathList = check.arrayOf(isPath, MAX_PATH_LIST)
+const isPathOrPathList: ArgCheck = (value) => isPath(value) || isPathList(value)
+const isEncoding = check.optional(
+  check.oneOf(
+    'utf8',
+    'utf-8',
+    'ascii',
+    'base64',
+    'base64url',
+    'hex',
+    'latin1',
+    'binary',
+    'ucs2',
+    'ucs-2',
+    'utf16le',
+    'utf-16le'
+  )
+)
+const isFileData: ArgCheck = (value) =>
+  typeof value === 'string' || ArrayBuffer.isView(value)
+
+export function registerFsIpc() {
+  handleSafe<DirEntry[]>('fs:readdirWithTypes', [], [isPath], async (_, folderPath: string) => {
+    assertReadablePath(folderPath, 'fs:readdirWithTypes')
+    const entries = await fs.readdir(folderPath, { withFileTypes: true })
+
+    const result: DirEntry[] = await Promise.all(
+      entries.map(async (dirent) => {
+        const fullPath = path.join(folderPath, dirent.name)
+
+        if (dirent.isDirectory()) {
+          return { path: dirent.name, type: 'folder' }
+        }
+
+        if (dirent.isFile()) {
+          return { path: dirent.name, type: 'file' }
+        }
+
+        const stats = await fs.stat(fullPath)
+        return {
+          path: dirent.name,
+          type: stats.isDirectory() ? 'folder' : 'file'
+        }
+      })
+    )
+
+    result.sort((a, b) => {
+      if (a.type === 'folder' && b.type === 'file') return -1
+      if (a.type === 'file' && b.type === 'folder') return 1
+      return a.path.localeCompare(b.path)
+    })
+
+    return result
+  })
+
+  handleSafe<string[]>('fs:getDirectories', [], [isPath], async (_, source: string) => {
+    assertReadablePath(source, 'fs:getDirectories')
+    return await getDirectories(source)
+  })
+
+  handleSafe<string>('fs:readFile', '', [isPath, isEncoding], async (_, filePath: string, encoding: BufferEncoding = 'utf-8') => {
+    assertReadablePath(filePath, 'fs:readFile')
+    return await fs.readFile(filePath, encoding)
+  })
+
+  handleSafe<Uint8Array | null>('fs:readFileBuffer', null, [isPath], async (_, target: string) => {
+    const filePath = target.startsWith('file:') ? fileURLToPath(target) : target
+    assertReadablePath(filePath, 'fs:readFileBuffer')
+    const buffer = await fs.readFile(filePath)
+    return new Uint8Array(buffer)
+  })
+
+  handleSafe<boolean>('fs:rimraf', false, [isPathOrPathList], async (_, targetPath: string | string[]) => {
+    const targets = Array.isArray(targetPath) ? targetPath : [targetPath]
+    targets.forEach((target) => assertWritablePath(target, 'fs:rimraf'))
+    await Promise.all(targets.map((target) => fs.remove(target)))
+    return true
+  })
+
+  handleSafe<boolean>('file:archiveFiles', false, [isPathList, isPath, check.optional(isPath)], async (_, filesToArchive: string[], zipPath: string, basePath?: string) => {
+    assertWritablePath(zipPath, 'file:archiveFiles')
+    if (!Array.isArray(filesToArchive)) return false
+    filesToArchive.forEach((source) => assertReadablePath(source, 'file:archiveFiles'))
+    if (basePath !== undefined) assertReadablePath(basePath, 'file:archiveFiles')
+    const { createZipArchive } = await import('../utilities/archiver')
+    await createZipArchive(filesToArchive, zipPath, basePath, undefined, isExcludedInstancePath)
+    return true
+  })
+
+  handleSafe<boolean>('file:archiveForPublish', false, [isPathList, isPath, check.optional(isPath)], async (_, filesToArchive: string[], zipPath: string, basePath?: string) => {
+    assertWritablePath(zipPath, 'file:archiveForPublish')
+    if (!Array.isArray(filesToArchive)) return false
+    filesToArchive.forEach((source) => assertReadablePath(source, 'file:archiveForPublish'))
+    if (basePath !== undefined) assertReadablePath(basePath, 'file:archiveForPublish')
+    const { createZipArchive } = await import('../utilities/archiver')
+    const { collectSanitizedWorldEntries, shouldSkipPublishEntry } = await import(
+      '../utilities/worldPublish'
+    )
+    const sanitizedWorldEntries = await collectSanitizedWorldEntries(filesToArchive, basePath)
+    await createZipArchive(
+      filesToArchive,
+      zipPath,
+      basePath,
+      undefined,
+      shouldSkipPublishEntry,
+      sanitizedWorldEntries
+    )
+    return true
+  })
+
+  handleSafe<number | null>(
+    'file:getTotalSizes',
+    null,
+    [isPathList],
+    async (_, filePaths: string[]) => {
+      if (!Array.isArray(filePaths)) return null
+      filePaths.forEach((filePath) => assertReadablePath(filePath, 'file:getTotalSizes'))
+      return await getTotalSizes(filePaths)
+    }
+  )
+
+  handleSafe<boolean>('fs:ensure', false, [isPath], async (_, dirPath: string) => {
+    assertWritablePath(dirPath, 'fs:ensure')
+    await fs.ensureDir(dirPath)
+    return true
+  })
+
+  handleSafe<boolean>('fs:copy', false, [isPath, isPath], async (_, srcPath: string, destPath: string) => {
+    assertReadablePath(srcPath, 'fs:copy')
+    assertWritablePath(destPath, 'fs:copy')
+    await fs.copy(srcPath, destPath, { overwrite: true })
+    return true
+  })
+
+  handleSafe<boolean>('fs:writeFile', false, [isPath, isFileData, isEncoding], async (_, filePath: string, data: any, encoding: BufferEncoding = 'utf-8') => {
+    assertWritablePath(filePath, 'fs:writeFile')
+    await fs.writeFile(filePath, data, { encoding })
+    return true
+  })
+
+  handleSafe<boolean>('fs:pathExists', false, [isPath], async (_, targetPath: string) => {
+    assertReadablePath(targetPath, 'fs:pathExists')
+    return await fs.pathExists(targetPath)
+  })
+
+  handleSafe<string>('fs:sha1', '', [isPath], async (_, filePath: string) => {
+    assertReadablePath(filePath, 'fs:sha1')
+    return await getSha1(filePath)
+  })
+
+  handleSafe<string[]>('fs:readdir', [], [isPath], async (_, dirPath: string) => {
+    assertReadablePath(dirPath, 'fs:readdir')
+    return await fs.readdir(dirPath)
+  })
+
+  handleSafe<boolean>('fs:extractZip', false, [isPath, isPath], async (event, zipPath: string, destination: string) => {
+    assertReadablePath(zipPath, 'fs:extractZip')
+    assertWritablePath(destination, 'fs:extractZip')
+    const { extractZip } = await import('../utilities/archiver')
+    const report = throttleProgress((progress: ArchiveExtractProgress) =>
+      sendProgress(event.sender, 'archive:extractProgress', progress)
+    )
+    await extractZip(zipPath, destination, undefined, undefined, (processedBytes, totalBytes) =>
+      report({ archivePath: zipPath, processedBytes, totalBytes })
+    )
+    return true
+  })
+
+  handleSafe<boolean>('fs:rename', false, [isPath, isPath], async (_, oldPath: string, newPath: string) => {
+    assertWritablePath(oldPath, 'fs:rename')
+    assertWritablePath(newPath, 'fs:rename')
+    await fs.rename(oldPath, newPath)
+    return true
+  })
+
+  handleSafe<boolean>('fs:writeJSON', false, [isPath], async (_, filePath: string, data: any) => {
+    assertWritablePath(filePath, 'fs:writeJSON')
+    await writeJsonAtomic(filePath, data)
+    return true
+  })
+
+  handleSafe<any>('fs:readJSON', null, [isPath, isEncoding], async (_, filePath: string, encoding?: BufferEncoding) => {
+    assertReadablePath(filePath, 'fs:readJSON')
+    return await fs.readJSON(filePath, { encoding })
+  })
+
+  ipcMain.removeAllListeners('fs:writeJSONSync')
+  ipcMain.on('fs:writeJSONSync', (event, filePath: unknown, data: unknown) => {
+    try {
+      if (!isPath(filePath)) {
+        throw new IpcArgumentError('Refused fs:writeJSONSync: argument 0 is not allowed')
+      }
+      assertWritablePath(filePath as string, 'fs:writeJSONSync')
+      writeJsonAtomicSync(filePath as string, data)
+      event.returnValue = ''
+    } catch (error) {
+      console.error('[IPC] fs:writeJSONSync error:', error)
+      event.returnValue = redactSecrets(
+        error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      )
+    }
+  })
+}

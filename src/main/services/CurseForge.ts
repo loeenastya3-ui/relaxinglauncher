@@ -1,0 +1,226 @@
+import { attachApiHostFallback } from '../utilities/apiHost'
+import {
+  ICategory,
+  IFile,
+  IMod,
+  ISearchModsResponse,
+  ModLoaderType,
+  ModTypeClassIds,
+  ModsSearchSortField
+} from '@/types/CurseForge'
+import axios from 'axios'
+import { reportFailure } from '../utilities/failureBus'
+
+export class CurseForge {
+  private static api = attachApiHostFallback(
+    axios.create({
+      timeout: 30000
+    })
+  )
+
+  // The backend accepts up to 1000 ids and performs the upstream 50-item
+  // batching itself, so avoid dozens of redundant launcher-to-API requests.
+  private static readonly BATCH_LIMIT = 1000
+
+  private static chunk<T>(items: T[], size: number): T[][] {
+    const chunks: T[][] = []
+    for (let index = 0; index < items.length; index += size) {
+      chunks.push(items.slice(index, index + size))
+    }
+    return chunks
+  }
+
+  private static async retryOnce<T>(request: () => Promise<T>): Promise<T> {
+    try {
+      return await request()
+    } catch (error) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined
+      if (status !== undefined && status < 500 && status !== 429) throw error
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      return await request()
+    }
+  }
+
+  private static logAxiosError(prefix: string, error: unknown) {
+    reportFailure(error, { channel: 'service:curseforge' })
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      const statusText = error.response?.statusText
+      console.error(
+        `${prefix}:`,
+        status ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}` : error.message
+      )
+      return
+    }
+
+    console.error(`${prefix}:`, error)
+  }
+
+  static async search(
+    query: string,
+    options: {
+      version?: string
+      loader?: ModLoaderType
+      modType: ModTypeClassIds
+      category: string[]
+      sortField?: ModsSearchSortField
+    },
+    pagination: {
+      offset: number
+      limit: number
+    }
+  ): Promise<ISearchModsResponse | null> {
+    try {
+      const { version, loader, modType, category, sortField } = options
+      const params = new URLSearchParams()
+
+      params.append('query', query)
+      params.append('modType', modType.toString())
+      params.append('offset', pagination.offset.toString())
+      params.append('limit', pagination.limit.toString())
+      params.append('view', 'compact')
+
+      if (version) params.append('version', version)
+      if (loader !== undefined) params.append('loader', loader.toString())
+      if (sortField !== undefined) params.append('sortField', sortField.toString())
+
+      category.forEach((cat) => params.append('category', cat))
+
+      const response = await this.api.get<ISearchModsResponse>('/curseforge/search', {
+        params
+      })
+
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error searching mods', error)
+      return null
+    }
+  }
+
+  static async get(modId: number): Promise<IMod | null> {
+    try {
+      const response = await this.api.get<IMod>(`/curseforge/mods/${modId}`)
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting mod', error)
+      return null
+    }
+  }
+
+  static async getFile(modId: number, fileId: number): Promise<IFile | null> {
+    try {
+      const response = await this.api.get<IFile>(`/curseforge/mods/${modId}/files/${fileId}`)
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting file', error)
+      return null
+    }
+  }
+
+  static async getFileChangelog(modId: number, fileId: number): Promise<string | null> {
+    try {
+      const response = await this.api.get<string>(
+        `/curseforge/mods/${modId}/files/${fileId}/changelog`
+      )
+      return typeof response.data === 'string' ? response.data : null
+    } catch (error) {
+      this.logAxiosError('Error getting file changelog', error)
+      return null
+    }
+  }
+
+  static async getModFiles(
+    modId: number,
+    options: { modType: ModTypeClassIds; version?: string; loader?: ModLoaderType }
+  ): Promise<IFile[] | null> {
+    try {
+      const { modType, version, loader } = options
+      const params = new URLSearchParams()
+
+      params.append('modType', modType.toString())
+      if (version) params.append('version', version)
+      if (loader !== undefined) params.append('loader', loader.toString())
+
+      const response = await this.api.get<IFile[]>(`/curseforge/mods/${modId}/files`, {
+        params
+      })
+
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting mod files', error)
+      return null
+    }
+  }
+
+  static async getFilter(modType: ModTypeClassIds): Promise<ICategory[] | null> {
+    try {
+      const response = await this.api.get<ICategory[]>(`/curseforge/categories/${modType}`)
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting categories', error)
+      return null
+    }
+  }
+
+  static async getFiles(fileIds: number[]): Promise<IFile[]> {
+    try {
+      const responses = await Promise.all(
+        this.chunk(fileIds, this.BATCH_LIMIT).map((batch) =>
+          this.retryOnce(() => this.api.post<IFile[]>(`/curseforge/files`, { fileIds: batch }))
+        )
+      )
+      return responses.flatMap((response) => response.data)
+    } catch (error) {
+      this.logAxiosError('Error getting files', error)
+      return []
+    }
+  }
+
+  static async getFingerprintMatches(
+    fingerprints: number[]
+  ): Promise<{ id: number; modId: number; file: IFile }[] | null> {
+    if (fingerprints.length === 0) return []
+
+    try {
+      const responses = await Promise.all(
+        this.chunk(fingerprints, this.BATCH_LIMIT).map((batch) =>
+          this.retryOnce(() =>
+            this.api.post<{ id: number; modId: number; file: IFile }[]>(
+              `/curseforge/fingerprints`,
+              { fingerprints: batch }
+            )
+          )
+        )
+      )
+      return responses.flatMap((response) => response.data)
+    } catch (error) {
+      this.logAxiosError('Error identifying files on CurseForge', error)
+      return null
+    }
+  }
+
+  static async getMods(modIds: number[]): Promise<IMod[] | null> {
+    try {
+      const responses = await Promise.all(
+        this.chunk(modIds, this.BATCH_LIMIT).map((batch) =>
+          this.retryOnce(() => this.api.post<IMod[]>(`/curseforge/mods`, { modIds: batch }))
+        )
+      )
+      return responses.flatMap((response) => response.data)
+    } catch (error) {
+      this.logAxiosError('Error getting mods', error)
+      return null
+    }
+  }
+
+  static async getModDescription(modId: number): Promise<string | null> {
+    try {
+      const response = await this.api.get<string>(`/curseforge/mods/${modId}/description`)
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting mod description', error)
+      return null
+    }
+  }
+}

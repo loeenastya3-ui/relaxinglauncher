@@ -1,0 +1,301 @@
+import { Loader } from '@/types/Loader'
+import {
+  IProject,
+  IResult,
+  ProjectType,
+  IVersion,
+  ICategoryTag,
+  ILoaderTag,
+  SortValue,
+  VersionDependency
+} from '@/types/Modrinth'
+import { ServerCore } from '@/types/Server'
+import type {
+  ModrinthServer,
+  ModrinthServerImage,
+  ModrinthServerPage,
+  ModrinthServerQuery
+} from '@/types/ModrinthServers'
+import {
+  buildServerFilters,
+  normalizeServerGallery,
+  normalizeServerHit,
+  serverSortIndex
+} from '@/shared/modrinthServers'
+import axios from 'axios'
+import { app } from 'electron'
+import { reportFailure } from '../utilities/failureBus'
+
+const URL = 'https://api.modrinth.com/v2'
+const V3_URL = 'https://api.modrinth.com/v3'
+const CONTACT = 'https://relaxinglauncher.com'
+
+function buildUserAgent(): string {
+  let version = '0.0.0'
+  try {
+    version = app.getVersion()
+  } catch {}
+
+  return `RelaxingLauncher/${version} (${CONTACT})`
+}
+
+export class Modrinth {
+  private static api = axios.create({
+    baseURL: URL,
+    timeout: 30000,
+    headers: {
+      'User-Agent': buildUserAgent()
+    }
+  })
+
+  private static logAxiosError(prefix: string, error: unknown) {
+    reportFailure(error, { channel: 'service:modrinth' })
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      const statusText = error.response?.statusText
+      console.error(
+        `${prefix}:`,
+        status ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}` : error.message
+      )
+      return
+    }
+
+    console.error(`${prefix}:`, error)
+  }
+
+  static async search(
+    query: string,
+    options: {
+      version?: string
+      versions?: string[]
+      loader?: Loader | ServerCore
+      projectType: ProjectType
+      category?: string[]
+      sort?: SortValue
+    },
+    pagination: {
+      offset: number
+      limit: number
+    }
+  ) {
+    try {
+      const { version, versions, loader, projectType, category, sort } = options
+      const params = new URLSearchParams()
+
+      params.append('query', query)
+
+      if (sort) params.append('index', sort.toString())
+
+      const facets: string[][] = []
+
+      facets.push([`project_type:${projectType}`])
+
+      if (versions?.length) facets.push(versions.map((item) => `versions:${item}`))
+      else if (version) facets.push([`versions:${version}`])
+
+      if (
+        loader &&
+        projectType !== ProjectType.RESOURCEPACK &&
+        projectType !== ProjectType.SHADER &&
+        projectType !== ProjectType.DATAPACK
+      ) {
+        facets.push([`categories:${loader}`])
+      }
+
+      if (category && category.length > 0) {
+        facets.push(...category.map((c) => [`categories:${c.replace(/\+/g, '')}`]))
+      }
+
+      params.append('facets', JSON.stringify(facets))
+      params.append('limit', pagination.limit.toString())
+      params.append('offset', pagination.offset.toString())
+
+      const response = await this.api.get<IResult>('/search', {
+        params
+      })
+
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error searching Modrinth projects', error)
+      return null
+    }
+  }
+
+  static async searchServers(query: ModrinthServerQuery): Promise<ModrinthServerPage | null> {
+    try {
+      const params = new URLSearchParams()
+
+      if (query.query.trim()) params.append('query', query.query.trim())
+      params.append('index', serverSortIndex(query.sort))
+      params.append('new_filters', buildServerFilters(query))
+      params.append('limit', query.limit.toString())
+      params.append('offset', query.offset.toString())
+
+      const response = await this.api.get<{ hits?: unknown[]; total_hits?: number }>(
+        `${V3_URL}/search`,
+        { params }
+      )
+
+      const hits = Array.isArray(response.data?.hits) ? response.data.hits : []
+
+      return {
+        servers: hits
+          .map((hit) => normalizeServerHit(hit))
+          .filter((server): server is ModrinthServer => server !== null),
+        total: typeof response.data?.total_hits === 'number' ? response.data.total_hits : 0,
+        nextOffset: query.offset + hits.length
+      }
+    } catch (error) {
+      this.logAxiosError('Error searching Modrinth servers', error)
+      return null
+    }
+  }
+
+  static async getServerGallery(id: string): Promise<ModrinthServerImage[] | null> {
+    try {
+      const response = await this.api.get<unknown>(`${V3_URL}/project/${id}`)
+      return normalizeServerGallery(response.data)
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth server gallery', error)
+      return null
+    }
+  }
+
+  static async get(id: string) {
+    try {
+      const response = await this.api.get<IProject>(`/project/${id}`)
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth project', error)
+      return null
+    }
+  }
+
+  static async getVersion(id: string) {
+    try {
+      const response = await this.api.get<IVersion>(`/version/${id}`)
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth version', error)
+      return null
+    }
+  }
+
+  static async versions(
+    project_id: string,
+    options: { version?: string; loader?: Loader; project_type: ProjectType }
+  ) {
+    try {
+      const { version, loader, project_type } = options
+
+      const params = new URLSearchParams()
+
+      if (version) params.append('game_versions', JSON.stringify([version]))
+
+      if (
+        loader &&
+        project_type !== ProjectType.RESOURCEPACK &&
+        project_type !== ProjectType.SHADER &&
+        project_type !== ProjectType.DATAPACK
+      )
+        params.append('loaders', JSON.stringify([loader]))
+
+      const response = await this.api.get<IVersion[]>(`/project/${project_id}/version`, {
+        params
+      })
+
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth versions', error)
+      return null
+    }
+  }
+
+  static async getFilter(projectType: ProjectType) {
+    try {
+      const response = await this.api.get<ICategoryTag[]>(`/tag/category`)
+      return response.data.filter((c) => c.project_type == projectType)
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth filters', error)
+      return null
+    }
+  }
+
+  static async tags() {
+    try {
+      const categories = await this.api.get<ICategoryTag[]>(`/tag/category`)
+      const loaders = await this.api.get<ILoaderTag[]>(`/tag/loader`)
+
+      return {
+        tags: [...categories.data, ...loaders.data],
+        categories: categories.data
+      }
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth tags', error)
+      return null
+    }
+  }
+
+  static async getDependencies(deps: VersionDependency[]) {
+    try {
+      const ids = Array.from(
+        new Set(deps.map((d) => d.project_id).filter((id): id is string => !!id))
+      )
+
+      if (ids.length === 0) return []
+
+      const projects = await this.getProjects(ids)
+      if (!projects) return null
+
+      const byId = new Map(projects.map((project) => [project.id, project]))
+
+      const dependencies: IProject[] = []
+      for (let index = 0; index < deps.length; index++) {
+        const dependency = deps[index]
+
+        const project = dependency.project_id ? byId.get(dependency.project_id) : undefined
+
+        if (!project) continue
+
+        dependencies.push(project)
+      }
+
+      return dependencies
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth dependencies', error)
+      return null
+    }
+  }
+
+  static async versionsByHashes(hashes: string[]): Promise<Record<string, IVersion> | null> {
+    if (hashes.length === 0) return {}
+
+    try {
+      const response = await this.api.post<Record<string, IVersion>>('/version_files', {
+        hashes,
+        algorithm: 'sha1'
+      })
+
+      return response.data ?? {}
+    } catch (error) {
+      this.logAxiosError('Error identifying files on Modrinth', error)
+      return null
+    }
+  }
+
+  static async getProjects(ids: string[]) {
+    try {
+      const params = new URLSearchParams()
+      params.append('ids', JSON.stringify(ids))
+
+      const response = await this.api.get<IProject[]>(`/projects`, {
+        params
+      })
+
+      return response.data
+    } catch (error) {
+      this.logAxiosError('Error getting Modrinth projects', error)
+      return null
+    }
+  }
+}

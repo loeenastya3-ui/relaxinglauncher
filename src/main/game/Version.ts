@@ -1,0 +1,2443 @@
+import {
+  ILaunchOverride,
+  IVersionConf,
+  VersionDeleteResult,
+} from "@/types/IVersion";
+import { IVersionManifest } from "@/types/IVersionManifest";
+import { IAssetIndex } from "@/types/IAssetIndex";
+import { LANGUAGES, TSettings } from "@/types/Settings";
+import { IAuth, ILocalAccount } from "@/types/Account";
+import { Java } from "./Java";
+import { resolveJava } from "./javaRuntimes";
+import type { ResolvedJava } from "@/shared/javaRuntime";
+import { buildQuickPlayArguments } from "./quickPlayArgs";
+import { IFabricManifest } from "@/types/IFabricManifest";
+import { IInstallProfile } from "@/types/IInstallProfile";
+import { DownloadItem } from "@/types/Downloader";
+import path from "path";
+import fs from "fs-extra";
+import pLimit from "p-limit";
+import {
+  Downloader,
+  waitWhileDownloadsPaused,
+} from "../utilities/downloader";
+import { writeJsonAtomic } from "../utilities/atomicJson";
+import {
+  convertMavenCoordinateToJarPath,
+  generateCanonicalOfflineUUID,
+  getFullLangCode,
+  getJavaAgent,
+  getOS,
+  HTTP_AGENT_JVM_ARGUMENT,
+  matchesOsRules,
+  removeDuplicatesLibraries,
+} from "../utilities/other";
+import { app, shell } from "electron";
+import { runGame, runJar } from "../utilities/game";
+import { getAuthlibCached } from "../utilities/authlib";
+import {
+  AUTHLIB_PREFETCHED_PROPERTY,
+  resolveAuthlibServer,
+} from "../utilities/authlibServer";
+import { getDataRoot } from "../utilities/dataRoot";
+import { AuthlibEnsureResult } from "@/types/IAuthlib";
+import {
+  VersionInstallOperation,
+  VersionInstallOptions,
+  VersionInstallProgress,
+  VersionInstallStage,
+  VERSION_INSTALL_CANCELLED,
+} from "@/types/InstallationProgress";
+import { mainWindow } from "../windows/mainWindow";
+import {
+  getUnusedInstallResourcePaths,
+  normalizeInstallResourcePath,
+  shouldCleanupCancelledInstall,
+  shouldCloseInstallProgress,
+} from "../utilities/installCleanup";
+import {
+  createLoaderInstallerProgressState,
+  parseLoaderInstallerProgressLine,
+} from "../utilities/loaderInstallerProgress";
+import { assertSafeVersionName } from "@/shared/versionName";
+import { resolveLaunchPath } from "./launchAlias";
+import { assertSafeFileSegment } from "./serverScriptSafety";
+import { Backend } from "../services/Backend";
+import { buildMemoryArguments } from "@/shared/jvmDefaults";
+import { sessionNickname } from "@/shared/sessionNickname";
+import { instanceJavaMajor, mcVersionToJavaMajor } from "@/shared/javaVersions";
+import { filterRunArguments } from "@/shared/runArguments";
+import {
+  assertTrustedDownloadUrl,
+  assertTrustedLoaderLibraryUrl,
+  isTrustedDownloadUrl,
+  normalizeLoaderLibraryUrl,
+} from "../utilities/trustedHosts";
+import { migrateInlineModIcons } from "../utilities/modManager";
+import { journal, type JournalSpan } from "../journal/journal";
+import { describeLaunchCommand } from "../journal/launchCommand";
+import { mergeLoaderLibraries } from "./loaderLibraries";
+import {
+  collectInstallerLibraries,
+  collectProcessorArtifacts,
+  isModernInstallProfile,
+  isSameFile,
+  linkOrCopy,
+  safeVersionId,
+  versionLibraryPaths,
+} from "./loaderInstallerSeed";
+import {
+  directLegacyLaunch,
+  legacyAssetsDir,
+  legacyFmlDownloads,
+  legacyForgeJvmArguments,
+  legacySessionArgument,
+  legacySortJvmArguments,
+  materializeLegacyAssets,
+  prepareLegacyHome,
+  usesLegacyWorkDir,
+  usesUppercaseLangCode,
+} from "./legacyGame";
+import {
+  isLegacyLoader,
+  isProfileLoader,
+  splitOrnitheGeneration,
+} from "@/shared/profileLoaders";
+import { VersionsService } from "../services/Versions";
+import {
+  completeOrnitheProfile,
+  libraryDownloadUrls,
+  profileJvmArguments,
+  replaceVanillaLibraries,
+  toManifestLibrary,
+} from "./profileLoaderManifest";
+import {
+  JAR_MOD_ASM,
+  bundlesModLoader,
+  jarModDownloads,
+  prepareGameJar,
+  withJarModAsm,
+} from "./jarMods";
+import {
+  BTA_VANILLA_CLIENT,
+  BTA_VANILLA_JAR,
+  shipsOwnClientJar,
+} from "@/shared/btaLoader";
+import {
+  applyBabricLayer,
+  hasBabricLayer,
+  readTurnipInstance,
+  turnipInstanceUrls,
+} from "./btaBabric";
+import {
+  applyFoxLoaderLayer,
+  assertFoxLoaderBuild,
+  hasFoxLoaderLayer,
+} from "./foxLoader";
+
+type VersionInstallRuntimeOptions = VersionInstallOptions & {
+  signal?: AbortSignal;
+};
+
+const AUTHLIB_INJECTOR_COORDINATES =
+  "com.github.yushijinhun:authlib-injector:";
+
+const FILES_STAGE_START_PERCENT = 62;
+const FILES_STAGE_END_PERCENT = 94;
+
+const JAVA_CLASS_NAME = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
+
+const LOADER_LIBRARY_MARKERS: Record<string, string[]> = {
+  fabric: ["fabricmc"],
+  quilt: ["quiltmc"],
+  forge: ["minecraftforge"],
+  neoforge: ["neoforged", "neoforge"],
+  "legacy-fabric": ["net.legacyfabric:intermediary"],
+  babric: ["babric:intermediary"],
+  ornithe: ["net.ornithemc:calamus-intermediary"],
+};
+
+function parseCustomRunArguments(input?: string) {
+  if (!input?.trim()) return [];
+
+  const args: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | null = null;
+
+  for (let index = 0; index < input.length; index++) {
+    const char = input[index];
+    const next = input[index + 1];
+
+    if (char === "\\" && (next === '"' || next === "'")) {
+      current += next;
+      index++;
+      continue;
+    }
+
+    if ((char === '"' || char === "'") && (!quote || quote === char)) {
+      quote = quote === char ? null : char;
+      continue;
+    }
+
+    if (!quote && /\s/.test(char)) {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current) args.push(current);
+
+  return args;
+}
+
+export class Version {
+  public version: IVersionConf;
+  public manifest: IVersionManifest | undefined;
+
+  public launcherPath: string = "";
+  public minecraftPath: string = "";
+  public versionPath: string = "";
+  public javaPath: string = "";
+  public java: ResolvedJava | null = null;
+  public isQuickPlayMultiplayer: boolean = false;
+  public isQuickPlaySingleplayer: boolean = false;
+  private manifestPath: string = "";
+  private launchVersionPath: string = "";
+  private modLoaderLaunch: ILaunchOverride | null = null;
+
+  private downloader: Downloader = new Downloader(6);
+  private initPromise: Promise<void> | null = null;
+  private installOperation: VersionInstallOperation = "install";
+  private installAbortSignal: AbortSignal | null = null;
+  private installPlan: VersionInstallStage[] | undefined = undefined;
+  private installSpan: JournalSpan | null = null;
+  private lastLoggedStage: VersionInstallStage | null = null;
+  private readonly versionPathOverride: string | undefined;
+
+  constructor(version: IVersionConf, options: { versionPath?: string } = {}) {
+    this.version = version;
+    this.versionPathOverride = options.versionPath;
+  }
+
+  private async ensureInitialized() {
+    if (this.launcherPath && this.minecraftPath && this.versionPath) return;
+
+    if (!this.initPromise) {
+      this.initPromise = this.init().finally(() => {
+        this.initPromise = null;
+      });
+    }
+
+    await this.initPromise;
+  }
+
+  public async init() {
+    assertSafeVersionName(this.version.name);
+    assertSafeFileSegment(this.version.version.id, "version id");
+    if (this.version.loader.version?.id) {
+      assertSafeFileSegment(this.version.loader.version.id, "loader version id");
+    }
+
+    this.launcherPath = getDataRoot();
+    this.minecraftPath = path.join(this.launcherPath, "minecraft");
+    this.versionPath =
+      this.versionPathOverride ??
+      path.join(this.minecraftPath, "versions", this.version.name);
+    this.manifestPath = path.join(
+      this.versionPath,
+      `${this.version.version.id}.json`,
+    );
+    this.launchVersionPath = "";
+
+    await fs.ensureDir(this.versionPath);
+    const isExistsManifest = await fs.pathExists(this.manifestPath);
+
+    if (isExistsManifest) {
+      await this.readManifest();
+      if (this.manifest) await this.resolveJavaRuntime();
+    }
+  }
+
+  public requiredJavaMajor(): number {
+    return (
+      this.manifest?.javaVersion?.majorVersion ??
+      mcVersionToJavaMajor(this.version.version.id)
+    );
+  }
+
+  public async resolveJavaRuntime(): Promise<ResolvedJava> {
+    this.java = await resolveJava({
+      requiredMajor: this.requiredJavaMajor(),
+      override: this.version.overrides?.java,
+    });
+    this.javaPath = this.java.client;
+    return this.java;
+  }
+
+  private async resolveLaunchVersionPath() {
+    if (this.launchVersionPath) return this.launchVersionPath;
+
+    this.launchVersionPath = await resolveLaunchPath(
+      this.versionPath,
+      this.launcherPath,
+    );
+
+    return this.launchVersionPath;
+  }
+
+  private sendInstallInfo(info: VersionInstallProgress | null) {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.webContents.isDestroyed()) return;
+
+    try {
+      mainWindow.webContents.send("versionInstallProgress", info);
+    } catch {}
+  }
+
+  private sendInstallProgress(
+    stage: VersionInstallStage,
+    progressPercent: number,
+    isIndeterminate = false,
+    details?: string,
+    detailsKey?: string,
+    detailsParams?: VersionInstallProgress["detailsParams"],
+    subProgress?: VersionInstallProgress["subProgress"],
+  ) {
+    if (this.installSpan && stage !== this.lastLoggedStage) {
+      this.lastLoggedStage = stage;
+      this.installSpan.step(`stage ${stage}`, {
+        percent: progressPercent,
+        details: detailsKey ?? details,
+      });
+    }
+
+    this.sendInstallInfo({
+      versionName: this.version.name,
+      loaderName: this.version.loader.name,
+      operation: this.installOperation,
+      stage,
+      progressPercent,
+      isIndeterminate,
+      details,
+      detailsKey,
+      detailsParams,
+      subProgress,
+      plan: this.installPlan,
+    });
+  }
+
+  public cancelInstall() {
+    this.downloader.cancelDownload();
+  }
+
+  private throwIfInstallCancelled() {
+    if (this.installAbortSignal?.aborted) {
+      throw new Error(VERSION_INSTALL_CANCELLED);
+    }
+  }
+
+  private async installCheckpoint() {
+    this.throwIfInstallCancelled();
+    await waitWhileDownloadsPaused(
+      () => this.installAbortSignal?.aborted === true,
+    );
+    this.throwIfInstallCancelled();
+  }
+
+  private isInstallCancelError(error: unknown) {
+    if (this.installAbortSignal?.aborted) return true;
+    if (error instanceof Error) {
+      return (
+        error.message === VERSION_INSTALL_CANCELLED ||
+        error.message === "AbortError" ||
+        error.name === "AbortError"
+      );
+    }
+
+    return false;
+  }
+
+  private async cleanupCancelledInstall(
+    account: ILocalAccount,
+    cleanupOnCancel?: boolean,
+  ) {
+    if (!shouldCleanupCancelledInstall(cleanupOnCancel)) return;
+
+    await this.delete(account, true).catch((error) => {
+      console.error(
+        `[version:install] failed to cleanup cancelled install ${this.versionPath}:`,
+        error,
+      );
+    });
+  }
+
+  public async install(
+    settings: TSettings,
+    account: ILocalAccount,
+    items: DownloadItem[] = [],
+    options: VersionInstallRuntimeOptions = {},
+  ) {
+    await this.ensureInitialized();
+    this.downloader = new Downloader(settings.downloadLimit || 6);
+    this.downloader.versionName = this.version.name;
+    this.installOperation = options.operation ?? "install";
+    this.installAbortSignal = options.signal ?? null;
+    this.installPlan = options.plan;
+    this.lastLoggedStage = null;
+    this.installSpan = journal.span("install", this.installOperation, {
+      versionName: this.version.name,
+      minecraft: this.version.version.id,
+      loader: this.version.loader.name,
+      loaderVersion: this.version.loader.version?.id,
+      extraItems: items.length,
+      downloadLimit: settings.downloadLimit,
+      downloadSource: settings.downloadSource,
+      plan: options.plan,
+    });
+    const installSpan = this.installSpan;
+    this.sendInstallProgress("preparing", 2, true);
+
+    let succeeded = false;
+
+    try {
+      await this.installCheckpoint();
+      await this.installInternal(settings, account, items);
+      await this.installCheckpoint();
+      if (!options.keepProgressOpen) this.sendInstallProgress("done", 100);
+      succeeded = true;
+      installSpan.ok({ javaPath: this.javaPath || null });
+    } catch (error) {
+      if (this.isInstallCancelError(error)) {
+        installSpan.ok({ cancelled: true });
+        await this.cleanupCancelledInstall(account, options.cleanupOnCancel);
+        throw new Error(VERSION_INSTALL_CANCELLED);
+      }
+
+      installSpan.fail(error);
+      throw error;
+    } finally {
+      this.installSpan = null;
+      const wasCancelled = Boolean(this.installAbortSignal?.aborted);
+      if (
+        shouldCloseInstallProgress(
+          succeeded,
+          options.keepProgressOpen,
+          wasCancelled,
+        )
+      ) {
+        this.sendInstallInfo(null);
+      }
+      this.installOperation = "install";
+      this.installAbortSignal = null;
+      this.installPlan = undefined;
+    }
+  }
+
+  private baseManifestUrl() {
+    return shipsOwnClientJar(this.version.loader.name) &&
+      this.version.loader.version
+      ? this.version.loader.version.url
+      : this.version.version.url;
+  }
+
+  private isLoaderMerged() {
+    if (!this.manifest) return false;
+    if (!this.version.loader.version?.id) return true;
+    if (shipsOwnClientJar(this.version.loader.name)) {
+      return (
+        this.manifest.id === this.version.loader.version.id &&
+        hasBabricLayer(this.manifest)
+      );
+    }
+    if (this.version.loader.name === "foxloader") {
+      return hasFoxLoaderLayer(this.manifest, this.version.loader.version.id);
+    }
+
+    const markers = LOADER_LIBRARY_MARKERS[this.version.loader.name];
+    if (!markers) return true;
+
+    return (this.manifest.libraries ?? []).some((library) => {
+      const name = library.name?.toLowerCase() ?? "";
+      return markers.some((marker) => name.includes(marker));
+    });
+  }
+
+  private async installInternal(
+    settings: TSettings,
+    account: ILocalAccount,
+    items: DownloadItem[] = [],
+  ) {
+    const downloadItems: DownloadItem[] = [...items];
+    const downloadSignal = this.installAbortSignal ?? undefined;
+    await this.installCheckpoint();
+
+    const manifestPath = path.join(
+      this.versionPath,
+      `${this.version.version.id}.json`,
+    );
+    let isNewManifest = false;
+
+    if (!this.manifest && (await fs.pathExists(manifestPath))) {
+      await this.readManifest();
+    }
+
+    if (!this.manifest || !this.isLoaderMerged()) {
+      isNewManifest = true;
+      this.manifest = undefined;
+      await fs.remove(manifestPath).catch(() => {});
+
+      const baseManifestUrl = this.baseManifestUrl();
+      assertTrustedDownloadUrl(baseManifestUrl, "version manifest url");
+
+      this.sendInstallProgress("manifest", 8, true);
+      await this.downloader.downloadFiles(
+        [
+          {
+            url: baseManifestUrl,
+            destination: manifestPath,
+            group: "manifest",
+          },
+        ],
+        downloadSignal,
+      );
+    }
+
+    await this.installCheckpoint();
+    this.sendInstallProgress("manifest", 12, false);
+    await this.readManifest();
+    await this.installCheckpoint();
+
+    if (!this.manifest) {
+      throw new Error(`Failed to read version manifest: ${manifestPath}`);
+    }
+
+    if (
+      isNewManifest &&
+      shipsOwnClientJar(this.version.loader.name) &&
+      this.version.loader.version
+    ) {
+      this.sendInstallProgress("loader", 14, true);
+      await this.applyBtaBabricLayer(
+        this.version.loader.version.id,
+        downloadSignal,
+      );
+      await this.installCheckpoint();
+    }
+
+    if (
+      isNewManifest &&
+      this.version.loader.name === "foxloader" &&
+      this.version.loader.version
+    ) {
+      this.sendInstallProgress("loader", 14, true);
+      await this.applyFoxLoader(this.version.loader.version);
+      await this.installCheckpoint();
+    }
+
+    if (isNewManifest && this.version.loader.name === "babric") {
+      this.manifest.javaVersion = {
+        component: this.manifest.javaVersion?.component ?? "",
+        majorVersion: instanceJavaMajor(
+          this.version.version.id,
+          this.version.loader.name,
+          this.manifest.javaVersion?.majorVersion,
+        ),
+      };
+    }
+
+    this.sendInstallProgress("java", 18, true);
+    const requiredJavaMajor = this.requiredJavaMajor();
+    const needsJavaBeforeLoader = ["forge", "neoforge"].includes(
+      this.version.loader.name,
+    );
+    let installerJavaPath = "";
+    let pendingJava: Java | null = null;
+
+    if (needsJavaBeforeLoader) {
+      const installerJava = await resolveJava({
+        requiredMajor: requiredJavaMajor,
+      });
+      installerJavaPath = installerJava.client;
+
+      if (installerJava.problem === "not_installed") {
+        const java = new Java(requiredJavaMajor);
+        await java.init(downloadSignal);
+        await this.installCheckpoint();
+        await java.install(downloadSignal, this.version.name);
+        await this.installCheckpoint();
+        installerJavaPath = java.javaPath;
+      }
+    }
+
+    const gameJava = await this.resolveJavaRuntime();
+    await this.installCheckpoint();
+
+    if (gameJava.problem === "not_installed") {
+      const java = new Java(gameJava.major);
+      const javaItem = await java.prepareInstallItem(downloadSignal);
+      await this.installCheckpoint();
+
+      if (javaItem) {
+        downloadItems.push(javaItem);
+        pendingJava = java;
+      } else {
+        await this.resolveJavaRuntime();
+      }
+    } else if (gameJava.problem) {
+      console.warn(
+        `[version:install] the Java chosen for ${this.version.name} is unavailable (${gameJava.problem}): ${gameJava.home}`,
+      );
+    }
+
+    const agent = "-Dhttp.agent=Mozilla/5.0";
+    if (
+      requiredJavaMajor === 8 &&
+      this.manifest.arguments?.jvm &&
+      !this.manifest.arguments.jvm.includes(agent)
+    ) {
+      this.manifest.arguments.jvm.push(agent);
+    }
+
+    let isDownloadClient = true;
+    this.sendInstallProgress("loader", 28, true);
+
+    if (
+      isProfileLoader(this.version.loader.name) &&
+      this.version.loader.version
+    ) {
+      const fabricManifestPath = path.join(
+        this.versionPath,
+        `${this.version.loader.name}.json`,
+      );
+      let fabricManifest: IFabricManifest | undefined = undefined;
+
+      if (await fs.pathExists(fabricManifestPath)) {
+        try {
+          fabricManifest = await fs.readJSON(fabricManifestPath, {
+            encoding: "utf-8",
+          });
+        } catch (error) {
+          console.error(
+            `Failed to read loader manifest ${fabricManifestPath}:`,
+            error,
+          );
+          await fs.remove(fabricManifestPath).catch(() => {});
+        }
+      }
+
+      if (!fabricManifest) {
+        await this.installCheckpoint();
+        assertTrustedDownloadUrl(
+          this.version.loader.version.url,
+          "loader manifest url",
+        );
+        await this.downloader.downloadFiles(
+          [
+            {
+              url: this.version.loader.version.url,
+              destination: fabricManifestPath,
+              group: "manifest",
+            },
+          ],
+          downloadSignal,
+        );
+        fabricManifest = await fs.readJSON(fabricManifestPath, {
+          encoding: "utf-8",
+        });
+        if (this.version.loader.name === "ornithe" && fabricManifest) {
+          fabricManifest = await this.completeOrnitheProfile(fabricManifest);
+          await writeJsonAtomic(fabricManifestPath, fabricManifest);
+        }
+      }
+      await this.installCheckpoint();
+
+      if (isNewManifest && fabricManifest) {
+        this.manifest.mainClass = fabricManifest.mainClass;
+
+        const jvmArguments = profileJvmArguments(
+          fabricManifest.arguments?.jvm,
+          !!this.manifest.minecraftArguments,
+        );
+        if (this.manifest.arguments) {
+          if (fabricManifest.arguments?.jvm && this.manifest.arguments.jvm)
+            this.manifest.arguments.jvm.push(...jvmArguments);
+
+          if (fabricManifest.arguments?.game && this.manifest.arguments.game)
+            this.manifest.arguments.game.push(...fabricManifest.arguments.game);
+        } else if (jvmArguments.length > 0) {
+          this.manifest.arguments = { game: [], jvm: jvmArguments };
+        }
+
+        const fabricLibraries = fabricManifest.libraries.map((lib) => {
+          const library = toManifestLibrary(lib);
+          for (const url of libraryDownloadUrls(library)) {
+            assertTrustedLoaderLibraryUrl(
+              url,
+              `${this.version.loader.name} library url`,
+            );
+          }
+          return library;
+        });
+
+        this.manifest.libraries = isLegacyLoader(this.version.loader.name)
+          ? replaceVanillaLibraries(fabricLibraries, this.manifest.libraries)
+          : this.removeDuplicateLibraries(
+              [...fabricLibraries, ...this.manifest.libraries],
+              ["org.ow2.asm:asm"],
+            );
+        await this.writeManifest();
+      }
+    } else if (
+      ["forge", "neoforge"].includes(this.version.loader.name) &&
+      this.version.loader.version
+    ) {
+      const installerPath = path.join(
+        this.versionPath,
+        `${this.version.loader.name}.jar`,
+      );
+
+      const isExistsInstaller = await fs.pathExists(installerPath);
+      if (!isExistsInstaller) {
+        assertTrustedDownloadUrl(
+          this.version.loader.version.url,
+          "loader installer url",
+        );
+        await this.downloader.downloadFiles(
+          [
+            {
+              url: this.version.loader.version.url,
+              destination: installerPath,
+              group: this.version.loader.name,
+            },
+          ],
+          downloadSignal,
+        );
+      }
+      await this.installCheckpoint();
+
+      if (isNewManifest) {
+        const tempPath = path.join(this.versionPath, "temp");
+        await fs.remove(tempPath).catch(() => {});
+        await fs.ensureDir(tempPath);
+
+        try {
+          await this.writeLauncherProfile();
+
+          let forgeInstalled = false;
+          const installerProgressState = createLoaderInstallerProgressState(38);
+          const createLoaderInstallerSubProgress = (
+            progressPercent: number,
+            detailsKey: string,
+            detailsParams?: VersionInstallProgress["detailsParams"],
+            isIndeterminate = false,
+          ): VersionInstallProgress["subProgress"] => ({
+            kind: "loaderInstaller",
+            titleKey: "installationProgress.subProgress.loaderInstaller.title",
+            progressPercent: Math.max(
+              0,
+              Math.min(
+                100,
+                Math.round(((progressPercent - 38) / (58 - 38)) * 100),
+              ),
+            ),
+            isIndeterminate,
+            detailsKey,
+            detailsParams,
+          });
+          const handleInstallerOutput = (message: string) => {
+            for (const line of message.split(/\r?\n/)) {
+              const update = parseLoaderInstallerProgressLine(
+                line,
+                installerProgressState,
+                { startPercent: 38, endPercent: 58 },
+              );
+              if (!update) continue;
+
+              this.sendInstallProgress(
+                "installer",
+                update.progressPercent,
+                true,
+                undefined,
+                undefined,
+                undefined,
+                createLoaderInstallerSubProgress(
+                  update.progressPercent,
+                  update.detailsKey,
+                  update.detailsParams,
+                ),
+              );
+            }
+          };
+
+          this.sendInstallProgress(
+            "installer",
+            38,
+            true,
+            undefined,
+            undefined,
+            undefined,
+            createLoaderInstallerSubProgress(
+              38,
+              "installationProgress.installerDetails.starting",
+            ),
+          );
+
+          const launchBasePath = await this.resolveLaunchVersionPath();
+          const seed = await this.seedLoaderInstaller(
+            installerPath,
+            tempPath,
+            downloadSignal,
+            (detailsKey) =>
+              this.sendInstallProgress(
+                "installer",
+                38,
+                true,
+                undefined,
+                undefined,
+                undefined,
+                createLoaderInstallerSubProgress(
+                  38,
+                  detailsKey,
+                  undefined,
+                  true,
+                ),
+              ),
+          );
+          await this.installCheckpoint();
+
+          try {
+            if (!seed.modern) {
+              throw new Error("installer has no processors, using its profile");
+            }
+            const installResult = seed.cached
+              ? "done"
+              : await runJar(
+                  installerJavaPath,
+                  [
+                    "-jar",
+                    path.join(
+                      launchBasePath,
+                      `${this.version.loader.name}.jar`,
+                    ),
+                    "--installClient",
+                    ".",
+                  ],
+                  path.join(launchBasePath, "temp"),
+                  {
+                    signal: downloadSignal,
+                    onOutput: ({ message }) => handleInstallerOutput(message),
+                  },
+                );
+            forgeInstalled = installResult === "done" || installResult === 0;
+          } catch (error) {
+            this.sendInstallProgress(
+              "installer",
+              Math.max(42, installerProgressState.progressPercent),
+              true,
+              undefined,
+              undefined,
+              undefined,
+              createLoaderInstallerSubProgress(
+                Math.max(42, installerProgressState.progressPercent),
+                "installationProgress.installerDetails.legacyFallback",
+                undefined,
+                true,
+              ),
+            );
+            console.warn(
+              `${this.version.loader.name} installer failed, falling back to install_profile.json:`,
+              error,
+            );
+          }
+
+          const versionsPath = path.join(tempPath, "versions");
+          await this.installCheckpoint();
+          const forgeManifestName =
+            this.version.loader.name == "forge"
+              ? `${this.version.version.id}-forge-${this.version.loader.version.id}`
+              : `neoforge-${this.version.loader.version.id}`;
+          const installedForgeManifestPath = forgeInstalled
+            ? await this.findInstalledLoaderManifestPath(
+                versionsPath,
+                forgeManifestName,
+              )
+            : null;
+
+          this.sendInstallProgress("loader", 58, true);
+          await this.installCheckpoint();
+
+          if (!forgeInstalled || !installedForgeManifestPath) {
+            const { openArchive, readEntryData, readJSONFromArchive } =
+              await import("../utilities/archiver");
+            const installProfile = await readJSONFromArchive<IInstallProfile>(
+              installerPath,
+              "install_profile.json",
+            );
+            if (!installProfile?.versionInfo?.libraries) {
+              throw new Error(
+                "Failed to read install_profile.json from Forge installer.",
+              );
+            }
+
+            this.manifest.mainClass = installProfile.versionInfo.mainClass;
+            this.manifest.minecraftArguments =
+              installProfile.versionInfo.minecraftArguments;
+
+            const librariesPath = path.join(this.minecraftPath, "libraries");
+            const embeddedName = installProfile.install?.path;
+            const embeddedEntry = installProfile.install?.filePath
+              ? (await openArchive(installerPath)).getEntry(
+                  installProfile.install.filePath,
+                )
+              : null;
+            const embeddedPath = embeddedName
+              ? convertMavenCoordinateToJarPath(embeddedName)
+              : null;
+            const embeddedTarget = embeddedPath
+              ? path.resolve(librariesPath, embeddedPath)
+              : null;
+            const embedded =
+              embeddedEntry &&
+              embeddedTarget?.startsWith(path.resolve(librariesPath) + path.sep)
+                ? embeddedPath
+                : null;
+            if (embedded && embeddedEntry && embeddedTarget) {
+              await fs.outputFile(
+                embeddedTarget,
+                await readEntryData(embeddedEntry),
+              );
+            }
+
+            const loaderLibraries: IVersionManifest["libraries"] = [];
+            for (const lib of installProfile.versionInfo.libraries) {
+              if (lib.natives) continue;
+              if (!lib.url) lib.url = "https://libraries.minecraft.net/";
+
+              let path = convertMavenCoordinateToJarPath(lib.name);
+              const isEmbedded = !!embedded && lib.name === embeddedName;
+
+              if (path.includes("minecraftforge/forge")) {
+                path = path.replace(".jar", `-universal.jar`);
+              }
+
+              const artifactUrl = normalizeLoaderLibraryUrl(
+                `${lib.url}/${path}`,
+              );
+              assertTrustedDownloadUrl(artifactUrl, "forge library url");
+
+              const library: IVersionManifest["libraries"][0] = {
+                name: lib.name,
+                downloads: {
+                  artifact: {
+                    url: artifactUrl,
+                    path: isEmbedded && embedded ? embedded : path,
+                    size: 0,
+                    sha1: lib.checksums && !isEmbedded ? lib.checksums[0] : "",
+                  },
+                },
+              };
+
+              loaderLibraries.push(library);
+            }
+            this.manifest.libraries = mergeLoaderLibraries(
+              loaderLibraries,
+              this.manifest.libraries,
+            );
+          } else {
+            const installedClientPath = path.join(
+              versionsPath,
+              this.version.version.id,
+              `${this.version.version.id}.jar`,
+            );
+
+            const clientPath = path.join(
+              this.versionPath,
+              `${this.version.version.id}.jar`,
+            );
+            if (await fs.pathExists(installedClientPath)) {
+              if (!(await isSameFile(installedClientPath, clientPath))) {
+                await fs.copyFile(installedClientPath, clientPath);
+              }
+              isDownloadClient = false;
+            }
+
+            const forgeManifestPath = path.join(
+              this.versionPath,
+              `${this.version.loader.name}.json`,
+            );
+
+            await fs.copyFile(installedForgeManifestPath, forgeManifestPath);
+
+            const tempLibrariesPath = path.join(tempPath, "libraries");
+            if (await fs.pathExists(tempLibrariesPath)) {
+              await fs.copy(
+                tempLibrariesPath,
+                path.join(this.minecraftPath, "libraries"),
+                {
+                  overwrite: true,
+                  filter: async (source, target) =>
+                    !(await isSameFile(source, target)),
+                },
+              );
+            }
+
+            const forgeManifest: IVersionManifest = await fs.readJSON(
+              forgeManifestPath,
+              "utf-8",
+            );
+
+            this.manifest.mainClass = forgeManifest.mainClass;
+
+            if (forgeManifest.arguments?.jvm && this.manifest.arguments?.jvm)
+              this.manifest.arguments.jvm.push(...forgeManifest.arguments.jvm);
+
+            if (forgeManifest.arguments?.game && this.manifest.arguments?.game)
+              this.manifest.arguments.game.push(
+                ...forgeManifest.arguments.game,
+              );
+
+            if (forgeManifest.minecraftArguments) {
+              this.manifest.minecraftArguments =
+                forgeManifest.minecraftArguments;
+            }
+
+            this.manifest.libraries = this.removeDuplicateLibraries(
+              [...forgeManifest.libraries, ...this.manifest.libraries],
+              this.version.loader.name == "forge"
+                ? ["com.google.guava:guava", "com.google.guava:failureaccess"]
+                : [
+                    "org.ow2.asm:asm",
+                    "org.apache.logging.log4j:log4j-slf4j2-impl",
+                  ],
+            );
+          }
+
+          await this.writeManifest();
+        } finally {
+          await fs.remove(tempPath).catch(() => {});
+        }
+      }
+    }
+
+    if (isDownloadClient) {
+      const clientPath = path.join(
+        this.versionPath,
+        `${this.version.version.id}.jar`,
+      );
+
+      downloadItems.push({
+        url: this.manifest.downloads.client.url,
+        destination: clientPath,
+        sha1: this.manifest.downloads.client.sha1,
+        size: this.manifest.downloads.client.size,
+        group: "client",
+      });
+
+      if (shipsOwnClientJar(this.version.loader.name)) {
+        downloadItems.push({
+          ...BTA_VANILLA_CLIENT,
+          destination: path.join(this.versionPath, BTA_VANILLA_JAR),
+          group: "client",
+        });
+      }
+    }
+
+    downloadItems.push(
+      ...(await jarModDownloads(this.versionPath, this.version)),
+    );
+
+    if (account.type != "microsoft" && account.type != "plain") {
+      await this.installCheckpoint();
+      const authlib = await getAuthlibCached();
+      const existsAuthlib = this.manifest.libraries.find(
+        (lib) => lib.name === authlib?.name,
+      );
+
+      if (authlib && !existsAuthlib) {
+        this.manifest.libraries.push({
+          name: authlib.name,
+          downloads: {
+            artifact: {
+              url: authlib.url,
+              path: authlib.path,
+              size: authlib.size,
+              sha1: authlib.sha1,
+            },
+          },
+        });
+
+        await this.writeManifest();
+      }
+    }
+
+    if (isNewManifest) {
+      this.manifest.libraries = removeDuplicatesLibraries(
+        this.manifest.libraries,
+      );
+      await this.writeManifest();
+    }
+
+    const libraries = this.getLibraries(account);
+
+    downloadItems.push(...libraries.downloadItems);
+    downloadItems.push(
+      ...legacyFmlDownloads(
+        this.version.loader.name,
+        this.version.version.id,
+        this.versionPath,
+      ),
+    );
+
+    const assetsIndex = this.manifest.assetIndex;
+    const assetsIndexPath = path.join(
+      this.minecraftPath,
+      "assets",
+      "indexes",
+      `${assetsIndex.id}.json`,
+    );
+
+    this.sendInstallProgress("assets", 62, true);
+    await this.downloader.downloadFiles(
+      [
+        {
+          url: assetsIndex.url,
+          destination: assetsIndexPath,
+          sha1: assetsIndex.sha1,
+          group: "assets",
+          size: assetsIndex.size,
+        },
+      ],
+      downloadSignal,
+    );
+    await this.installCheckpoint();
+
+    const assets = await this.getAssets();
+    downloadItems.push(...assets.downloadItems);
+
+    this.sendInstallProgress("files", FILES_STAGE_START_PERCENT, true);
+    this.downloader.onInfo = (info) => {
+      if (!info) return;
+
+      const percent = Math.max(0, Math.min(100, info.progressPercent));
+      this.sendInstallProgress(
+        "files",
+        FILES_STAGE_START_PERCENT +
+          Math.round(
+            (percent / 100) *
+              (FILES_STAGE_END_PERCENT - FILES_STAGE_START_PERCENT),
+          ),
+      );
+    };
+
+    try {
+      await this.downloader.downloadFiles(downloadItems, downloadSignal, {
+        verifyChecksums: this.installOperation === "integrity",
+      });
+    } finally {
+      this.downloader.onInfo = null;
+    }
+    await this.installCheckpoint();
+
+    if (pendingJava) {
+      await pendingJava.finalizeInstall();
+      await this.resolveJavaRuntime();
+    }
+
+    await this.prepareLegacyAssets(this.versionPath);
+
+    const optionsPath = path.join(this.versionPath, "options.txt");
+    const isExistsOptions = await fs.pathExists(optionsPath);
+    if (!isExistsOptions) {
+      this.sendInstallProgress("options", 94, false);
+      const lang = LANGUAGES.find((l) => l.code == settings.lang);
+      if (lang) {
+        await fs.writeFile(
+          optionsPath,
+          `lang:${getFullLangCode(
+            lang,
+            usesUppercaseLangCode(this.version.version.id),
+          )}`,
+          "utf-8",
+        );
+      }
+    }
+  }
+
+  public async save() {
+    await this.ensureInitialized();
+
+    await migrateInlineModIcons(this.version.loader.mods ?? []).catch(
+      () => false,
+    );
+
+    this.versionPath = path.join(
+      this.minecraftPath,
+      "versions",
+      this.version.name,
+    );
+    await writeJsonAtomic(
+      path.join(this.versionPath, "version.json"),
+      this.version,
+    );
+  }
+
+  private getLibraries(account: ILocalAccount) {
+    if (!this.manifest) return { downloadItems: [], paths: [] };
+
+    const platform = getOS();
+    if (!platform) return { downloadItems: [], paths: [] };
+
+    const librariesPath = path.join(this.minecraftPath, "libraries");
+
+    const downloadItems: DownloadItem[] = [];
+    const paths: string[] = [];
+
+    const libraries = withJarModAsm(this.manifest.libraries, this.version);
+
+    for (const library of libraries) {
+      if (
+        library.name.includes("authlib-injector") &&
+        (account.type == "microsoft" || account.type == "plain")
+      )
+        continue;
+
+      if (!matchesOsRules(library.rules, platform)) continue;
+
+      const natives = library.natives;
+      const downloads = (library as any).downloads;
+
+      const artifact = downloads?.artifact;
+
+      if (!natives) {
+        if (!artifact?.path) continue;
+
+        const libraryPath = path.join(librariesPath, artifact.path);
+
+        if (!artifact.url && !fs.existsSync(libraryPath)) continue;
+
+        paths.push(libraryPath);
+
+        if (artifact.url) {
+          downloadItems.push({
+            url: artifact.url,
+            destination: libraryPath,
+            sha1: artifact.sha1,
+            size: artifact.size,
+            group: "libraries",
+          });
+        }
+      } else {
+        const native = natives[platform.os]?.replace("${arch}", "64");
+        if (!native) continue;
+
+        const classifiers = downloads?.classifiers;
+        if (!classifiers) continue;
+
+        const classifier = classifiers[native];
+        if (!classifier?.path || !classifier?.url) continue;
+
+        const fileName = classifier.path.split("/").pop();
+        if (!fileName) continue;
+
+        const classifierPath = path.join(this.versionPath, "natives", fileName);
+
+        downloadItems.push({
+          url: classifier.url,
+          destination: classifierPath,
+          sha1: classifier.sha1,
+          size: classifier.size,
+          group: "natives",
+          options: { extract: true, extractDelete: false },
+        });
+      }
+    }
+
+    return { downloadItems, paths };
+  }
+
+  private launchTarget(manifest: IVersionManifest) {
+    const override = this.version.launchOverride ?? this.modLoaderLaunch;
+    const applies =
+      !!override &&
+      this.version.loader.name === "vanilla" &&
+      !!manifest.minecraftArguments &&
+      JAVA_CLASS_NAME.test(override.mainClass);
+
+    return {
+      mainClass: applies ? override.mainClass : manifest.mainClass,
+      minecraftArguments: applies
+        ? override.minecraftArguments
+        : manifest.minecraftArguments,
+    };
+  }
+
+  private async resolveModLoaderLaunch(gameJar: string) {
+    if (!this.manifest || this.version.loader.name !== "vanilla") return null;
+    if (this.version.launchOverride) return null;
+
+    const direct = directLegacyLaunch(this.manifest);
+    if (!direct) return null;
+
+    return (await bundlesModLoader(path.join(this.versionPath, gameJar)))
+      ? direct
+      : null;
+  }
+
+  private async ensureJarModAsm() {
+    if (!this.manifest) return;
+    if (!withJarModAsm(this.manifest.libraries, this.version).includes(JAR_MOD_ASM))
+      return;
+
+    const artifact = JAR_MOD_ASM.downloads.artifact;
+    const destination = path.join(this.minecraftPath, "libraries", artifact.path);
+    if (await fs.pathExists(destination)) return;
+
+    await this.downloader.downloadFiles([
+      {
+        url: artifact.url,
+        destination,
+        sha1: artifact.sha1,
+        size: artifact.size,
+        group: "libraries",
+        options: { silent: true },
+      },
+    ]);
+  }
+
+  private normalizeResourcePath(targetPath: string) {
+    return normalizeInstallResourcePath(targetPath);
+  }
+
+  private getAssetIndexPath(manifest: IVersionManifest) {
+    if (!manifest.assetIndex?.id) return null;
+
+    return path.join(
+      this.minecraftPath,
+      "assets",
+      "indexes",
+      `${manifest.assetIndex.id}.json`,
+    );
+  }
+
+  private getLibraryPathsFromManifest(
+    manifest: IVersionManifest,
+    account: ILocalAccount,
+  ) {
+    const platform = getOS();
+    if (!platform) return [];
+
+    const librariesPath = path.join(this.minecraftPath, "libraries");
+    const paths: string[] = [];
+
+    for (const library of manifest.libraries ?? []) {
+      if (
+        library.name.includes("authlib-injector") &&
+        (account.type == "microsoft" || account.type == "plain")
+      )
+        continue;
+
+      if (!matchesOsRules(library.rules, platform) || library.natives) continue;
+
+      const artifact = (library as any).downloads?.artifact;
+      if (!artifact?.path) continue;
+
+      paths.push(path.join(librariesPath, artifact.path));
+    }
+
+    return paths;
+  }
+
+  private async getAssetPathsFromManifest(manifest: IVersionManifest) {
+    const assetsIndexPath = this.getAssetIndexPath(manifest);
+    if (!assetsIndexPath) return { paths: [] as string[], complete: true };
+
+    const paths = [assetsIndexPath];
+
+    if (!(await fs.pathExists(assetsIndexPath))) {
+      return { paths, complete: true };
+    }
+
+    try {
+      const assets: IAssetIndex = await fs.readJSON(assetsIndexPath, "utf-8");
+
+      for (const value of Object.values(assets.objects ?? {})) {
+        if (!value.hash) continue;
+
+        const subHash = value.hash.substring(0, 2);
+        paths.push(
+          path.join(
+            this.minecraftPath,
+            "assets",
+            "objects",
+            subHash,
+            value.hash,
+          ),
+        );
+      }
+    } catch (error) {
+      console.error(`Failed to read the asset index ${assetsIndexPath}:`, error);
+      return { paths, complete: false };
+    }
+
+    return { paths, complete: true };
+  }
+
+  private async getOtherVersionManifestPaths() {
+    const versionsPath = path.join(this.minecraftPath, "versions");
+    const currentPath = this.normalizeResourcePath(this.versionPath);
+    const manifestPaths: string[] = [];
+    let complete = true;
+
+    const directories = await fs.readdir(versionsPath).catch((error) => {
+      console.error(`Failed to list installed versions ${versionsPath}:`, error);
+      complete = false;
+      return [] as string[];
+    });
+
+    for (const directory of directories) {
+      const versionPath = path.join(versionsPath, directory);
+      if (this.normalizeResourcePath(versionPath) === currentPath) continue;
+
+      const stats = await fs.stat(versionPath).catch(() => null);
+      if (!stats) {
+        complete = false;
+        continue;
+      }
+      if (!stats.isDirectory()) continue;
+
+      const files = await fs.readdir(versionPath).catch((error) => {
+        console.error(`Failed to list version files ${versionPath}:`, error);
+        complete = false;
+        return [] as string[];
+      });
+
+      for (const file of files) {
+        if (!file.endsWith(".json") || file === "version.json") continue;
+        manifestPaths.push(path.join(versionPath, file));
+      }
+    }
+
+    return { manifestPaths, complete };
+  }
+
+  private async getOtherVersionResourcePaths(account: ILocalAccount) {
+    const resourcePaths = new Set<string>();
+    const { manifestPaths, complete } = await this.getOtherVersionManifestPaths();
+    let readEveryManifest = complete;
+
+    for (const manifestPath of manifestPaths) {
+      try {
+        const manifest: IVersionManifest = await fs.readJSON(
+          manifestPath,
+          "utf-8",
+        );
+
+        for (const libraryPath of this.getLibraryPathsFromManifest(
+          manifest,
+          account,
+        )) {
+          resourcePaths.add(this.normalizeResourcePath(libraryPath));
+        }
+
+        const assets = await this.getAssetPathsFromManifest(manifest);
+        if (!assets.complete) readEveryManifest = false;
+
+        for (const assetPath of assets.paths) {
+          resourcePaths.add(this.normalizeResourcePath(assetPath));
+        }
+      } catch (error) {
+        console.error(
+          `Failed to read the version manifest ${manifestPath}:`,
+          error,
+        );
+        readEveryManifest = false;
+      }
+    }
+
+    return { resourcePaths, complete: readEveryManifest };
+  }
+
+  private getUnusedResourcePaths(
+    resourcePaths: string[],
+    usedByOtherVersions: Set<string>,
+  ) {
+    return getUnusedInstallResourcePaths(resourcePaths, usedByOtherVersions);
+  }
+
+  private removeDuplicateLibraries(
+    libraries: IVersionManifest["libraries"],
+    checkLibraries: string[],
+  ): IVersionManifest["libraries"] {
+    function compareVersions(version1: string, version2: string): number {
+      const tokenize = (ver: string): (string | number)[] => {
+        const parts = ver.split(/[-.]/);
+        return parts.map((part) => {
+          if (/^\d+$/.test(part)) return parseInt(part, 10);
+          return part.toLowerCase();
+        });
+      };
+
+      const v1Parts = tokenize(version1);
+      const v2Parts = tokenize(version2);
+
+      for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
+        const part1 = v1Parts[i] ?? (typeof v1Parts[0] === "number" ? 0 : "");
+        const part2 = v2Parts[i] ?? (typeof v2Parts[0] === "number" ? 0 : "");
+
+        if (typeof part1 === "number" && typeof part2 === "number") {
+          if (part1 < part2) return -1;
+          if (part1 > part2) return 1;
+        } else if (typeof part1 === "string" && typeof part2 === "string") {
+          const cmp = part1.localeCompare(part2);
+          if (cmp !== 0) return cmp;
+        } else if (typeof part1 === "number") {
+          return -1;
+        } else if (typeof part2 === "number") {
+          return 1;
+        }
+      }
+
+      return 0;
+    }
+
+    const libraryMap = new Map<string, IVersionManifest["libraries"][0]>();
+    const otherLibs: IVersionManifest["libraries"] = [];
+
+    for (const lib of libraries) {
+      const [groupId, artifactId] = lib.name.split(":");
+      const key = `${groupId}:${artifactId}`;
+
+      const shouldCheck = checkLibraries.some((checkLib) =>
+        lib.name.startsWith(checkLib),
+      );
+
+      if (shouldCheck) {
+        const existingLib = libraryMap.get(key);
+
+        if (!existingLib) {
+          libraryMap.set(key, lib);
+        } else {
+          const existingVersion = existingLib.name.split(":")[2];
+          const currentVersion = lib.name.split(":")[2];
+          if (compareVersions(currentVersion, existingVersion) > 0) {
+            libraryMap.set(key, lib);
+          }
+        }
+      } else {
+        otherLibs.push(lib);
+      }
+    }
+
+    return [...Array.from(libraryMap.values()), ...otherLibs];
+  }
+
+  private async readManifest() {
+    const manifestPath = path.join(
+      this.versionPath,
+      `${this.version.version.id}.json`,
+    );
+
+    try {
+      this.manifest = await fs.readJSON(manifestPath, "utf-8");
+
+      if (this.manifest?.arguments?.game)
+        for (let i = 0; i < this.manifest.arguments.game.length; i++) {
+          const a = this.manifest.arguments.game[i];
+          if (typeof a != "object") continue;
+          if (!a.rules) continue;
+
+          const rule = a.rules[0];
+          const features = rule?.features;
+
+          if (rule.action == "allow" && features?.is_quick_play_multiplayer)
+            this.isQuickPlayMultiplayer = true;
+
+          if (rule.action == "allow" && features?.is_quick_play_singleplayer)
+            this.isQuickPlaySingleplayer = true;
+        }
+    } catch (error) {
+      console.error(`Failed to read version manifest ${manifestPath}:`, error);
+
+      if (error instanceof SyntaxError) {
+        this.manifest = undefined;
+        await fs.remove(manifestPath).catch(() => {});
+      }
+    }
+  }
+
+  private async completeOrnitheProfile(
+    profile: IFabricManifest,
+  ): Promise<IFabricManifest> {
+    const minecraftVersion = this.version.version.id;
+    const { generation } = splitOrnitheGeneration(
+      this.version.loader.version?.id ?? "",
+    );
+    const [intermediary, upgrades] = await Promise.all([
+      VersionsService.getOrnitheIntermediary(minecraftVersion, generation),
+      VersionsService.getOrnitheLibraryUpgrades(minecraftVersion, generation),
+    ]);
+    return completeOrnitheProfile(profile, intermediary, upgrades);
+  }
+
+  private async writeManifest() {
+    if (!this.manifest) return;
+
+    const manifestPath = path.join(
+      this.versionPath,
+      `${this.version.version.id}.json`,
+    );
+    await writeJsonAtomic(manifestPath, this.manifest);
+  }
+
+  private async prepareLegacyAssets(gameDir: string): Promise<string | null> {
+    const indexId = this.manifest?.assetIndex?.id;
+    if (!indexId) return null;
+
+    const assetsPath = path.join(this.minecraftPath, "assets");
+    const index: IAssetIndex | null = await fs
+      .readJSON(path.join(assetsPath, "indexes", `${indexId}.json`), "utf-8")
+      .catch(() => null);
+    if (!index) return null;
+
+    const target = legacyAssetsDir(index, {
+      minecraftPath: this.minecraftPath,
+      indexId,
+      gameDir,
+    });
+    if (!target) return null;
+
+    await materializeLegacyAssets(
+      index,
+      path.join(assetsPath, "objects"),
+      target,
+    ).catch((error) =>
+      console.warn(
+        `[version] failed to lay out legacy assets in ${target}:`,
+        error,
+      ),
+    );
+    return target;
+  }
+
+  private async getAssets() {
+    if (!this.manifest) return { downloadItems: [], paths: [] };
+
+    const downloadItems: DownloadItem[] = [];
+    const paths: string[] = [];
+
+    const assetsIndex = this.manifest.assetIndex;
+    const assetsIndexPath = path.join(
+      this.minecraftPath,
+      "assets",
+      "indexes",
+      `${assetsIndex.id}.json`,
+    );
+
+    const existsIndex = await fs.pathExists(assetsIndexPath);
+    if (!existsIndex) {
+      return { downloadItems: [], paths: [] };
+    }
+
+    const assets: IAssetIndex = await fs.readJSON(assetsIndexPath, "utf-8");
+
+    for (const [_, value] of Object.entries(assets.objects)) {
+      const hash = value.hash;
+      const subHash = hash.substring(0, 2);
+      const assetPath = path.join(
+        this.minecraftPath,
+        "assets",
+        "objects",
+        subHash,
+        hash,
+      );
+
+      paths.push(assetPath);
+      downloadItems.push({
+        url: `https://resources.download.minecraft.net/${subHash}/${hash}`,
+        destination: assetPath,
+        sha1: hash,
+        size: value.size,
+        group: "assets",
+      });
+    }
+
+    return { downloadItems, paths };
+  }
+
+  private async getRunArguments(
+    account: ILocalAccount,
+    settings: TSettings,
+    authData: IAuth | null,
+    launchVersionPath: string,
+    quickSingle?: string,
+    quickMultiplayer?: string,
+  ) {
+    if (!this.manifest)
+      return {
+        jvm: [],
+        game: [],
+      };
+
+    const gameJar = await prepareGameJar(this.versionPath, this.version);
+    this.modLoaderLaunch = await this.resolveModLoaderLaunch(gameJar);
+
+    const platform = getOS();
+    const separator = platform?.os == "windows" ? ";" : ":";
+
+    const launcherPath = getDataRoot();
+
+    const needsAuthlib =
+      !!account.type && account.type != "microsoft" && account.type != "plain";
+    const authlib = needsAuthlib ? await getAuthlibCached() : null;
+
+    let jvm: string[] = [];
+    let game: string[] = [];
+    const httpAgent = HTTP_AGENT_JVM_ARGUMENT;
+
+    if (
+      account.type &&
+      account.type != "microsoft" &&
+      account.type != "plain" &&
+      authlib
+    ) {
+      const authServer = await resolveAuthlibServer(account.type);
+      jvm.push(httpAgent);
+      if (authServer)
+        jvm.push(`${AUTHLIB_PREFETCHED_PROPERTY}=${authServer.prefetched}`);
+      jvm.push(
+        getJavaAgent(
+          account.type,
+          path.join(launcherPath, "minecraft", "libraries", authlib.path),
+          false,
+          authServer?.url,
+        ),
+      );
+    }
+
+    game.push(
+      ...buildQuickPlayArguments({
+        quickSingle,
+        quickMultiplayer,
+        savedServer: this.version.quickServer,
+        supportsSingleplayer: this.isQuickPlaySingleplayer,
+        supportsMultiplayer: this.isQuickPlayMultiplayer,
+        isLegacyManifest:
+          this.manifest.type === "old_alpha" ||
+          this.manifest.type === "old_beta",
+      }),
+    );
+
+    jvm.push(...buildMemoryArguments(settings.xmx, settings.optimizedJvm));
+
+    if (process.platform === "win32") {
+      jvm.push(
+        "-Dstdout.encoding=UTF-8",
+        "-Dstderr.encoding=UTF-8",
+        "-Dsun.stdout.encoding=UTF-8",
+        "-Dsun.stderr.encoding=UTF-8",
+      );
+    }
+
+    const { minecraftArguments } = this.launchTarget(this.manifest);
+    if (minecraftArguments) {
+      const legacyHome = usesLegacyWorkDir(minecraftArguments)
+        ? await prepareLegacyHome({
+            dataRoot: launcherPath,
+            gameDir: launchVersionPath,
+          }).catch(() => null)
+        : null;
+      jvm.push(
+        ...(legacyHome?.jvm ?? []),
+        ...legacyForgeJvmArguments(this.version.loader.name, true),
+        ...legacySortJvmArguments(this.manifest.type),
+        ...["-Djava.library.path=${natives_directory}", "-cp", "${classpath}"],
+      );
+      game.push(...minecraftArguments.split(" "));
+    }
+
+    if (this.manifest.arguments?.jvm)
+      for (const arg of this.manifest.arguments.jvm) {
+        if (typeof arg === "string") {
+          if (arg === httpAgent && jvm.includes(httpAgent)) continue;
+          jvm.push(arg);
+          continue;
+        }
+
+        if (arg.rules) {
+          if (!matchesOsRules(arg.rules, platform) || !arg.value) continue;
+
+          if (typeof arg.value == "string") jvm.push(arg.value);
+          else jvm.push(...arg.value);
+        }
+      }
+
+    if (this.manifest.arguments?.game)
+      for (const arg of this.manifest.arguments.game) {
+        if (typeof arg === "string") {
+          game.push(arg);
+          continue;
+        }
+      }
+
+    jvm = jvm.filter((arg) => arg !== "");
+    game = game.filter((arg) => arg !== "");
+
+    const paths = [
+      ...this.getLibraries(account).paths,
+      path.join(launchVersionPath, gameJar),
+    ];
+
+    jvm = jvm.map((arg) => {
+      if (!this.manifest) return "";
+
+      return arg
+        .replace(
+          /\${natives_directory}/g,
+          path.join(launchVersionPath, "natives"),
+        )
+        .replace(/\${launcher_name}/g, "RelaxingLauncher")
+        .replace(/\${launcher_version}/g, app.getVersion())
+        .replace(/\${classpath}/g, paths.join(separator))
+        .replace(
+          /\${library_directory}/g,
+          path.join(this.minecraftPath, "libraries"),
+        )
+        .replace(/\${classpath_separator}/g, separator)
+        .replace(/\${version_name}/g, this.version.version.id);
+    });
+
+    if (!authData) {
+      const uuid = generateCanonicalOfflineUUID(account.nickname);
+
+      authData = {
+        nickname: account.nickname,
+        uuid,
+        exp: 0,
+        sub: uuid,
+        auth: {
+          accessToken: "0",
+          expiresAt: 0,
+          createdAt: 0,
+        },
+      };
+    }
+
+    const activeAuthData = authData;
+    const legacyAssets = this.manifest.minecraftArguments?.includes(
+      "${game_assets}",
+    )
+      ? await this.prepareLegacyAssets(launchVersionPath)
+      : null;
+
+    let gameToken: string | null = null;
+    if (account.type == "discord" && account.accessToken) {
+      gameToken = await new Backend(account.accessToken).getGameToken();
+    }
+    const playerName =
+      sessionNickname(gameToken ?? undefined) ||
+      account.nickname ||
+      activeAuthData.nickname;
+
+    game = game.map((arg) => {
+      if (!this.manifest) return "";
+
+      const authData = activeAuthData;
+
+      let accessToken = activeAuthData.auth.accessToken;
+      if (account.type == "discord")
+        accessToken = gameToken || activeAuthData.uuid;
+      if (!accessToken) accessToken = "0";
+
+      let accountType = "mojang";
+      if (account.type == "microsoft") accountType = "msa";
+      else if (account.type == "plain") accountType = "legacy";
+
+      return arg
+        .replace(/\${auth_player_name}/g, playerName)
+        .replace(/\${version_name}/g, this.version.version.id)
+        .replace(/\${game_directory}/g, launchVersionPath)
+        .replace(/\${assets_root}/g, path.join(this.minecraftPath, "assets"))
+        .replace(/\${assets_index_name}/g, this.manifest.assetIndex.id)
+        .replace(/\${auth_uuid}/g, authData.uuid)
+        .replace(/\${auth_access_token}/g, accessToken)
+        .replace(/\${clientid}/g, "relaxing-launcher")
+        .replace(/\${auth_xuid}/g, authData.uuid)
+        .replace(/\${user_type}/g, accountType)
+        .replace(/\${version_type}/g, this.manifest.type)
+        .replace(/\${user_properties}/g, "{}")
+        .replace(
+          /\${game_assets}/g,
+          legacyAssets ?? path.join(this.minecraftPath, "assets"),
+        )
+        .replace(
+          /\${auth_session}/g,
+          legacySessionArgument(
+            account.type !== "plain",
+            accessToken,
+            authData.uuid,
+          ),
+        );
+    });
+
+    if (this.version.runArguments) {
+      const customJvm = filterRunArguments(
+        parseCustomRunArguments(this.version.runArguments.jvm),
+        "jvm",
+      );
+      const customGame = filterRunArguments(
+        parseCustomRunArguments(this.version.runArguments.game),
+        "game",
+      );
+
+      const rejected = [...customJvm.rejected, ...customGame.rejected];
+      if (rejected.length) {
+        console.warn(
+          `[version:run] refused unsafe custom arguments for ${this.version.name}:`,
+          rejected,
+        );
+      }
+
+      jvm.push(...customJvm.safe);
+      game.push(...customGame.safe);
+    }
+
+    return { jvm, game };
+  }
+
+  public async getRunCommand(
+    account: ILocalAccount,
+    settings: TSettings,
+    isRelative: boolean = false,
+    authData: IAuth | null = null,
+    quickSingle?: string,
+    quickMultiplayer?: string,
+  ) {
+    await this.ensureInitialized();
+
+    if (!this.manifest || !this.javaPath) return null;
+
+    const launchVersionPath = isRelative
+      ? this.versionPath
+      : await this.resolveLaunchVersionPath();
+
+    const runArguments = await this.getRunArguments(
+      account,
+      settings,
+      authData,
+      launchVersionPath,
+      quickSingle,
+      quickMultiplayer,
+    );
+
+    const command = [
+      this.javaPath,
+      ...runArguments.jvm,
+      this.launchTarget(this.manifest).mainClass,
+      ...runArguments.game,
+    ];
+
+    const normalizePath = (path: string) => path.replace(/\\/g, "/");
+
+    if (isRelative) {
+      command[0] = command[0].replace(this.javaPath, "${javaPath}");
+      for (let i = 1; i < command.length; i++) {
+        const normalized = normalizePath(command[i]);
+        const normalizedMinecraftPath = normalizePath(this.minecraftPath);
+        command[i] = normalized.replaceAll(
+          normalizedMinecraftPath,
+          "${minecraftPath}",
+        );
+      }
+    }
+
+    return command;
+  }
+
+  public async ensureAuthlib(
+    account: ILocalAccount,
+  ): Promise<AuthlibEnsureResult> {
+    if (account.type == "microsoft" || account.type == "plain")
+      return { ok: true };
+
+    await this.ensureInitialized();
+    if (!this.manifest) return { ok: true };
+
+    const authlib = await getAuthlibCached();
+    if (!authlib) return { ok: false, reason: "unavailable" };
+
+    const staleAuthlib = this.manifest.libraries.filter(
+      (lib) =>
+        lib.name.startsWith(AUTHLIB_INJECTOR_COORDINATES) &&
+        lib.name !== authlib.name,
+    );
+    const existsAuthlib = this.manifest.libraries.some(
+      (lib) => lib.name === authlib.name,
+    );
+
+    if (staleAuthlib.length > 0 || !existsAuthlib) {
+      this.manifest.libraries = this.manifest.libraries.filter(
+        (lib) => !staleAuthlib.includes(lib),
+      );
+
+      if (!existsAuthlib) {
+        this.manifest.libraries.push({
+          name: authlib.name,
+          downloads: {
+            artifact: {
+              url: authlib.url,
+              path: authlib.path,
+              size: authlib.size,
+              sha1: authlib.sha1,
+            },
+          },
+        });
+      }
+
+      await this.writeManifest();
+    }
+
+    const authlibPath = path.join(
+      this.minecraftPath,
+      "libraries",
+      authlib.path,
+    );
+
+    if (await fs.pathExists(authlibPath)) return { ok: true };
+
+    try {
+      await this.downloader.downloadFiles([
+        {
+          url: authlib.url,
+          destination: authlibPath,
+          sha1: authlib.sha1,
+          size: authlib.size,
+          group: "libraries",
+          options: { silent: true },
+        },
+      ]);
+    } catch (error) {
+      console.error(
+        "[version:run] failed to download authlib-injector:",
+        error,
+      );
+      return { ok: false, reason: "download_failed" };
+    }
+
+    return { ok: true };
+  }
+
+  public async run(
+    account: ILocalAccount,
+    settings: TSettings,
+    authData: IAuth | null,
+    instance: number,
+    quick: {
+      single?: string;
+      multiplayer?: string;
+    },
+  ) {
+    const span = journal.span("game", "launch", {
+      versionName: this.version.name,
+      instance,
+      minecraft: this.version.version.id,
+      loader: this.version.loader.name,
+      loaderVersion: this.version.loader.version?.id,
+      mods: this.version.loader.mods?.length ?? 0,
+      jarMods: this.version.jarMods?.filter((mod) => mod.enabled).length ?? 0,
+      mainJar: this.version.mainJar?.enabled === true,
+      shareCode: this.version.shareCode,
+      accountType: account.type,
+      nickname: account.nickname,
+      memoryMb: settings.xmx,
+      memoryOverrideMb: this.version.overrides?.xmx,
+      optimizedJvm: settings.optimizedJvm,
+      highPriority: settings.highPriority,
+      quick,
+    });
+
+    try {
+      await this.ensureInitialized();
+
+      const authlib = await this.ensureAuthlib(account);
+      if (!authlib.ok) {
+        span.fail(new Error(`authlib-injector ${authlib.reason}`));
+        return false;
+      }
+
+      await this.ensureJarModAsm();
+
+      const command = await this.getRunCommand(
+        account,
+        settings,
+        false,
+        authData,
+        quick.single,
+        quick.multiplayer,
+      );
+      if (!command || !this.manifest) {
+        span.fail(
+          new Error(
+            this.manifest
+              ? `Java runtime was not found${this.java?.problem ? ` (${this.java.problem})` : ""}`
+              : "Version manifest is missing",
+          ),
+          {
+            javaPath: this.javaPath || null,
+            java: this.java,
+            versionPath: this.versionPath,
+          },
+        );
+        return false;
+      }
+
+      const target = this.launchTarget(this.manifest);
+      span.step("command built", {
+        javaMajor: this.java?.major ?? this.requiredJavaMajor(),
+        javaRequired: this.requiredJavaMajor(),
+        javaVia: this.java?.via,
+        javaSource: this.java?.source,
+        javaVendor: this.java?.vendor,
+        ...(await describeLaunchCommand(command, target.mainClass).catch(
+          (error) => ({ describeError: String(error) }),
+        )),
+      });
+
+      const launchVersionPath = await this.resolveLaunchVersionPath();
+      const legacyHome = usesLegacyWorkDir(target.minecraftArguments)
+        ? await prepareLegacyHome({
+            dataRoot: getDataRoot(),
+            gameDir: launchVersionPath,
+          }).catch(() => null)
+        : null;
+
+      runGame(
+        command[0],
+        command.slice(1),
+        this.versionPath,
+        this.version.name,
+        instance,
+        account.accessToken || "",
+        quick.multiplayer || this.version.quickServer,
+        {
+          trackStatistics: true,
+          accountSub: authData?.sub ?? null,
+          accountLabel: account.nickname,
+        },
+        settings.highPriority,
+        launchVersionPath,
+        span,
+        legacyHome?.env,
+      );
+
+      return true;
+    } catch (error) {
+      span.fail(error);
+      throw error;
+    }
+  }
+
+  private async applyBtaBabricLayer(
+    btaVersion: string,
+    signal: AbortSignal | undefined,
+  ) {
+    assertSafeFileSegment(btaVersion, "BTA version");
+    const archivePath = path.join(
+      this.versionPath,
+      `${this.version.loader.name}.zip`,
+    );
+
+    try {
+      let lastError: unknown = null;
+      let downloaded = false;
+      for (const url of turnipInstanceUrls(btaVersion)) {
+        try {
+          await fs.remove(archivePath);
+          await this.downloader.downloadFiles(
+            [{ url, destination: archivePath, group: "manifest" }],
+            signal,
+          );
+          downloaded = true;
+          break;
+        } catch (error) {
+          if (signal?.aborted) throw error;
+          lastError = error;
+        }
+      }
+      if (!downloaded) throw lastError ?? new Error("BTA instance not found");
+
+      const layer = await readTurnipInstance(archivePath);
+      for (const library of layer.libraries) {
+        for (const url of libraryDownloadUrls(library)) {
+          assertTrustedLoaderLibraryUrl(url, "BTA library url");
+        }
+      }
+
+      const librariesPath = path.join(this.minecraftPath, "libraries");
+      for (const local of layer.localLibraries) {
+        const target = path.resolve(librariesPath, local.path);
+        if (!target.startsWith(path.resolve(librariesPath) + path.sep)) continue;
+        await fs.outputFile(target, local.data);
+      }
+
+      if (!this.manifest) return;
+      this.manifest = applyBabricLayer(this.manifest, layer);
+      await this.writeManifest();
+    } finally {
+      await fs.remove(archivePath).catch(() => {});
+    }
+  }
+
+  private async applyFoxLoader(build: { id: string; url: string }) {
+    assertFoxLoaderBuild(build);
+    if (!this.manifest) return;
+
+    await fs.remove(
+      path.join(this.versionPath, `${this.version.version.id}.jar`),
+    );
+    this.manifest = applyFoxLoaderLayer(this.manifest, build);
+    await this.writeManifest();
+  }
+
+  private async seedLoaderInstaller(
+    installerPath: string,
+    tempPath: string,
+    signal: AbortSignal | undefined,
+    onStep: (detailsKey: string) => void,
+  ): Promise<{ modern: boolean; cached: boolean }> {
+    const { readJSONFromArchive } = await import("../utilities/archiver");
+    const profile = await readJSONFromArchive<unknown>(
+      installerPath,
+      "install_profile.json",
+    ).catch(() => null);
+    if (!isModernInstallProfile(profile)) {
+      return { modern: false, cached: false };
+    }
+
+    try {
+      const versionJson = profile.json
+        ? await readJSONFromArchive<{ id?: string; libraries?: [] }>(
+            installerPath,
+            profile.json.replace(/^\//, ""),
+          ).catch(() => null)
+        : null;
+      const librariesPath = path.join(this.minecraftPath, "libraries");
+      const libraries = collectInstallerLibraries(profile, versionJson)
+        .map((library) => ({
+          ...library,
+          url: normalizeLoaderLibraryUrl(library.url),
+        }))
+        .filter((library) => isTrustedDownloadUrl(library.url));
+
+      const mcId = this.version.version.id;
+      const clientPath = path.join(this.versionPath, `${mcId}.jar`);
+      const client = this.manifest?.downloads?.client;
+      const items: DownloadItem[] = libraries.map((library) => ({
+        url: library.url,
+        destination: path.join(librariesPath, library.path),
+        sha1: library.sha1,
+        size: library.size,
+        group: "libraries",
+      }));
+      if (client?.url && isTrustedDownloadUrl(client.url)) {
+        items.push({
+          url: client.url,
+          destination: clientPath,
+          sha1: client.sha1,
+          size: client.size,
+          group: "client",
+        });
+      }
+
+      onStep("installationProgress.installerDetails.downloadingLibraries");
+      await this.downloader.downloadFiles(items, signal);
+      await this.installCheckpoint();
+
+      const tempLibraries = path.join(tempPath, "libraries");
+      const seeded = [
+        ...libraries.map((library) => library.path),
+        ...collectProcessorArtifacts(profile),
+      ];
+      for (const relative of new Set(seeded)) {
+        const source = path.join(librariesPath, relative);
+        if (await fs.pathExists(source)) {
+          await linkOrCopy(source, path.join(tempLibraries, relative));
+        }
+      }
+
+      const tempVersion = path.join(tempPath, "versions", mcId);
+      if (await fs.pathExists(clientPath)) {
+        await linkOrCopy(clientPath, path.join(tempVersion, `${mcId}.jar`));
+      }
+      const manifestPath = path.join(this.versionPath, `${mcId}.json`);
+      if (await fs.pathExists(manifestPath)) {
+        await fs.copy(manifestPath, path.join(tempVersion, `${mcId}.json`));
+      }
+
+      const loaderId = safeVersionId(versionJson?.id);
+      const required = [
+        ...versionLibraryPaths(versionJson),
+        ...collectProcessorArtifacts(profile),
+      ];
+      const present = await Promise.all(
+        required.map((relative) =>
+          fs.pathExists(path.join(librariesPath, relative)),
+        ),
+      );
+      if (loaderId && required.length > 0 && present.every(Boolean)) {
+        await fs.outputJson(
+          path.join(tempPath, "versions", loaderId, `${loaderId}.json`),
+          versionJson,
+          { spaces: 2 },
+        );
+        return { modern: true, cached: true };
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      console.warn(
+        "[version:install] could not prepare the loader installer, it will download everything itself:",
+        error,
+      );
+    }
+
+    return { modern: true, cached: false };
+  }
+
+  private async writeLauncherProfile() {
+    const data = {
+      profiles: {},
+      clientToken: "",
+      authenticationDatabase: {},
+      selectedUser: "",
+      launcherVersion: {
+        name: "1.5.3",
+        format: 17,
+      },
+    };
+
+    await fs.writeJSON(
+      path.join(this.versionPath, "temp", "launcher_profiles.json"),
+      data,
+      {
+        encoding: "utf-8",
+        spaces: 2,
+      },
+    );
+  }
+
+  private async findInstalledLoaderManifestPath(
+    versionsPath: string,
+    expectedName: string,
+  ) {
+    const expectedPath = path.join(
+      versionsPath,
+      expectedName,
+      `${expectedName}.json`,
+    );
+
+    if (await fs.pathExists(expectedPath)) return expectedPath;
+
+    const versionDirs = await fs.readdir(versionsPath).catch(() => []);
+    const loaderName = this.version.loader.name.toLowerCase();
+
+    for (const dirName of versionDirs) {
+      const candidatePath = path.join(versionsPath, dirName, `${dirName}.json`);
+      if (!(await fs.pathExists(candidatePath))) continue;
+      if (dirName.toLowerCase().includes(loaderName)) return candidatePath;
+    }
+
+    for (const dirName of versionDirs) {
+      const candidatePath = path.join(versionsPath, dirName, `${dirName}.json`);
+      if (!(await fs.pathExists(candidatePath))) continue;
+
+      try {
+        const manifest: IVersionManifest = await fs.readJSON(
+          candidatePath,
+          "utf-8",
+        );
+        const libraries = manifest.libraries ?? [];
+        const hasLoaderLibrary = libraries.some((lib) => {
+          const name = lib.name.toLowerCase();
+          return (
+            name.includes("minecraftforge") ||
+            name.includes("neoforged") ||
+            name.includes("neoforge")
+          );
+        });
+
+        if (manifest.mainClass && hasLoaderLibrary) return candidatePath;
+      } catch {}
+    }
+
+    return null;
+  }
+
+  private async discardInstanceFolder(): Promise<VersionDeleteResult> {
+    if (!(await fs.pathExists(this.versionPath))) {
+      return { deleted: true, trashed: false };
+    }
+
+    const trashed = await shell
+      .trashItem(this.versionPath)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!trashed) await fs.remove(this.versionPath);
+
+    return { deleted: true, trashed };
+  }
+
+  public async delete(
+    account: ILocalAccount,
+    isFull: boolean = false,
+  ): Promise<VersionDeleteResult> {
+    await this.ensureInitialized();
+
+    if (!isFull) return await this.discardInstanceFolder();
+
+    const libraries = this.getLibraries(account);
+    const assets = await this.getAssets().catch((error) => {
+      console.error(
+        `Failed to list the assets of ${this.versionPath} before deleting:`,
+        error,
+      );
+      return null;
+    });
+    const assetIndexPath = this.manifest
+      ? this.getAssetIndexPath(this.manifest)
+      : null;
+    const usedByOtherVersions =
+      await this.getOtherVersionResourcePaths(account);
+
+    if (!assets || !usedByOtherVersions.complete) {
+      console.error(
+        `[version:delete] keeping shared files of ${this.versionPath}: the other installed versions could not be listed in full`,
+      );
+      return await this.discardInstanceFolder();
+    }
+
+    const removableResources = this.getUnusedResourcePaths(
+      [
+        ...libraries.paths,
+        ...assets.paths,
+        ...(assetIndexPath ? [assetIndexPath] : []),
+      ],
+      usedByOtherVersions.resourcePaths,
+    );
+
+    if (removableResources.length) {
+      const limit = pLimit(32);
+      await Promise.all(
+        removableResources.map((resource) =>
+          limit(() => fs.remove(resource)),
+        ),
+      );
+    }
+
+    return await this.discardInstanceFolder();
+  }
+}

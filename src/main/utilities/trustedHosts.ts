@@ -1,0 +1,147 @@
+const TRUSTED_DOWNLOAD_HOST_SUFFIXES = [
+  "mojang.com",
+  "minecraft.net",
+  "fabricmc.net",
+  "quiltmc.org",
+  "minecraftforge.net",
+  "neoforged.net",
+  "legacyfabric.net",
+  "glass-launcher.net",
+  "ornithemc.net",
+  "betterthanadventure.net",
+  "relaxinglauncher.com",
+] as const;
+
+export function isTrustedDownloadUrl(url: unknown): url is string {
+  if (typeof url !== "string" || url === "") return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "https:") return false;
+
+  const host = parsed.hostname.toLowerCase();
+  return TRUSTED_DOWNLOAD_HOST_SUFFIXES.some(
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`),
+  );
+}
+
+export function assertTrustedDownloadUrl(
+  url: string,
+  label = "download url",
+): string {
+  if (!isTrustedDownloadUrl(url)) {
+    throw new Error(`Refused untrusted ${label}: ${String(url)}`);
+  }
+  return url;
+}
+
+const LOADER_LIBRARY_HOST_SUFFIXES = [
+  ...TRUSTED_DOWNLOAD_HOST_SUFFIXES,
+  "repo1.maven.org",
+  "build.lwjgl.org",
+] as const;
+
+export function assertTrustedLoaderLibraryUrl(
+  url: string,
+  label = "loader library url",
+): string {
+  let host = "";
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:") host = parsed.hostname.toLowerCase();
+  } catch {}
+
+  const trusted = LOADER_LIBRARY_HOST_SUFFIXES.some(
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`),
+  );
+  if (!trusted) {
+    throw new Error(`Refused untrusted ${label}: ${String(url)}`);
+  }
+  return url;
+}
+
+const PUBLISHABLE_CONTENT_HOST_SUFFIXES = [
+  ...TRUSTED_DOWNLOAD_HOST_SUFFIXES,
+  "modrinth.com",
+  "curseforge.com",
+  "forgecdn.net",
+] as const;
+
+export function isPublishableContentUrl(url: unknown): url is string {
+  if (typeof url !== "string" || url === "") return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+
+  const host = parsed.hostname.toLowerCase();
+  return PUBLISHABLE_CONTENT_HOST_SUFFIXES.some(
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`),
+  );
+}
+
+const SERVER_CORE_HOST_SUFFIXES = [
+  ...TRUSTED_DOWNLOAD_HOST_SUFFIXES,
+  "papermc.io",
+  "purpurmc.org",
+  "spigotmc.org",
+  "getbukkit.org",
+  "mctimemachine.com",
+] as const;
+
+export function isTrustedServerCoreUrl(url: unknown): url is string {
+  if (typeof url !== "string" || url === "") return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "https:") return false;
+
+  const host = parsed.hostname.toLowerCase();
+  return SERVER_CORE_HOST_SUFFIXES.some(
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`),
+  );
+}
+
+export function assertTrustedServerCoreUrl(url: string): string {
+  if (!isTrustedServerCoreUrl(url)) {
+    throw new Error(`Refused untrusted server core url: ${String(url)}`);
+  }
+  return url;
+}
+
+const LEGACY_FORGE_MAVEN_HOSTS = ["files.minecraftforge.net"];
+
+export function normalizeLoaderLibraryUrl(url: string): string {
+  if (typeof url !== "string" || !url) return url;
+
+  let normalized = url.replace(/^http:\/\//i, "https://");
+
+  for (const host of LEGACY_FORGE_MAVEN_HOSTS) {
+    normalized = normalized.replace(
+      new RegExp(`^https://${host.replace(/\./g, "\\.")}`, "i"),
+      "https://maven.minecraftforge.net",
+    );
+  }
+
+  normalized = normalized.replace(
+    /^https:\/\/maven\.legacyfabric\.net\//i,
+    "https://repo.legacyfabric.net/legacyfabric/",
+  );
+
+  return normalized.replace(/([^:])\/{2,}/g, "$1/");
+}

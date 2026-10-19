@@ -1,0 +1,98 @@
+import { ipcMain } from 'electron'
+import {
+  authDiscord,
+  authElyBy,
+  authMicrosoft,
+  refreshDiscordToken,
+  refreshElyByToken,
+  refreshMicrosoftToken
+} from '../services/Auth'
+import {
+  startOAuthServer,
+  stopOAuthServer,
+  type OAuthCallbackProvider,
+} from '../utilities/authServer'
+
+let oauthServerPromise:
+  | Promise<{
+      code: string
+      provider: OAuthCallbackProvider
+    }>
+  | null = null
+let oauthServerState: string | null = null
+
+export function registerAuthIpc() {
+  const register = <T extends any[]>(
+    channel: string,
+    handler: (event: Electron.IpcMainInvokeEvent, ...args: T) => any
+  ) => {
+    ipcMain.removeHandler(channel)
+    ipcMain.handle(channel, handler as any)
+  }
+
+  register('auth:microsoft', async (_, code: string, codeVerifier?: string) => {
+    if (typeof code !== 'string' || !code) throw new Error('Invalid code')
+    if (codeVerifier !== undefined && typeof codeVerifier !== 'string') {
+      throw new Error('Invalid codeVerifier')
+    }
+    const auth = await authMicrosoft(code, codeVerifier)
+    return auth
+  })
+
+  register('auth:microsoft:refresh', async (_, refreshToken: string, id: string) => {
+    if (typeof refreshToken !== 'string' || !refreshToken) throw new Error('Invalid refreshToken')
+    if (typeof id !== 'string' || !id) throw new Error('Invalid id')
+    const auth = await refreshMicrosoftToken(refreshToken, id)
+    return auth
+  })
+
+  register('auth:elyby', async (_, code: string) => {
+    if (typeof code !== 'string' || !code) throw new Error('Invalid code')
+    const auth = await authElyBy(code)
+    return auth
+  })
+
+  register('auth:elyby:refresh', async (_, refreshToken: string, id: string) => {
+    if (typeof refreshToken !== 'string' || !refreshToken) throw new Error('Invalid refreshToken')
+    if (typeof id !== 'string' || !id) throw new Error('Invalid id')
+    const auth = await refreshElyByToken(refreshToken, id)
+    return auth
+  })
+
+  register('auth:discord', async (_, code: string) => {
+    if (typeof code !== 'string' || !code) throw new Error('Invalid code')
+    const auth = await authDiscord(code)
+    return auth
+  })
+
+  register('auth:discord:refresh', async (_, refreshToken: string, id: string) => {
+    if (typeof refreshToken !== 'string' || !refreshToken) throw new Error('Invalid refreshToken')
+    if (typeof id !== 'string' || !id) throw new Error('Invalid id')
+    const auth = await refreshDiscordToken(refreshToken, id)
+    return auth
+  })
+
+  register('auth:startServer', async (_, expectedState: string) => {
+    if (typeof expectedState !== 'string' || !expectedState) {
+      throw new Error('Invalid OAuth state')
+    }
+
+    if (!oauthServerPromise || oauthServerState !== expectedState) {
+      oauthServerState = expectedState
+      oauthServerPromise = startOAuthServer(expectedState).finally(() => {
+        if (oauthServerState === expectedState) {
+          oauthServerPromise = null
+          oauthServerState = null
+        }
+      })
+    }
+    return await oauthServerPromise
+  })
+
+  register('auth:stopServer', async () => {
+    await stopOAuthServer('OAuth sign-in was cancelled.')
+    oauthServerPromise = null
+    oauthServerState = null
+    return true
+  })
+}

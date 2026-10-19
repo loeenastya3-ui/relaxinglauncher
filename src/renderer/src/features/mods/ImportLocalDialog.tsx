@@ -1,0 +1,307 @@
+import { IAddedLocalProject, IProject, ProjectType } from "@/types/ModManager";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Hint } from "@renderer/components/Hint";
+import { formatBytes } from "@renderer/utilities/file";
+import {
+  CircleAlert,
+  FileBox,
+  Loader2,
+  PackageCheck,
+  PowerOff,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  type SelectionGesture,
+  applySelectionGesture,
+  nextSelectionAnchor,
+  preventShiftTextSelection,
+  readSelectionGesture,
+} from "@renderer/utilities/rangeSelection";
+import { formatDate } from "./format";
+import { ProjectIcon } from "./ProjectIcon";
+import { withEnabledFiles } from "./localImport";
+
+export type ImportMode = "import" | "restore";
+
+const TYPE_KEY: Record<string, string> = {
+  [ProjectType.MOD]: "modManager.projectTypes.mod",
+  [ProjectType.RESOURCEPACK]: "modManager.projectTypes.resourcepack",
+  [ProjectType.SHADER]: "modManager.projectTypes.shader",
+  [ProjectType.DATAPACK]: "modManager.projectTypes.datapack",
+  [ProjectType.PLUGIN]: "modManager.projectTypes.plugin",
+  [ProjectType.WORLD]: "modManager.projectTypes.world",
+  [ProjectType.MODPACK]: "modManager.projectTypes.modpack",
+};
+
+export function ImportLocalDialog({
+  onClose,
+  projects,
+  addProjects,
+  mode = "import",
+  lang,
+  sizeUnits,
+}: {
+  onClose: () => void;
+  projects: IAddedLocalProject[];
+  addProjects: (projects: IProject[]) => void | Promise<void>;
+  mode?: ImportMode;
+  lang: string;
+  sizeUnits: string[];
+}) {
+  const { t } = useTranslation();
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [enableDisabled, setEnableDisabled] = useState(false);
+
+  const validIndexes = useMemo(
+    () =>
+      projects
+        .map((item, index) => (item.status === "valid" ? index : -1))
+        .filter((index) => index !== -1),
+    [projects],
+  );
+
+  useEffect(() => {
+    setSelected(new Set(validIndexes));
+  }, [validIndexes]);
+
+  const selectedCount = selected.size;
+  const validCount = validIndexes.length;
+  const allSelected = validCount > 0 && selectedCount === validCount;
+
+  const selectedDisabledCount = useMemo(
+    () =>
+      projects.filter((item, index) => selected.has(index) && item.disabled)
+        .length,
+    [projects, selected],
+  );
+
+  const selectedProjects = useMemo(
+    () =>
+      projects
+        .filter((_, index) => selected.has(index))
+        .map((item) => (enableDisabled ? withEnabledFiles(item) : item))
+        .map((item) => item.project),
+    [enableDisabled, projects, selected],
+  );
+
+  const anchorRef = useRef<number | null>(null);
+
+  const toggle = useCallback(
+    (index: number, gesture: SelectionGesture) => {
+      const anchor = anchorRef.current;
+      anchorRef.current = nextSelectionAnchor(
+        validIndexes,
+        anchor,
+        index,
+        gesture,
+      );
+      setSelected((prev) =>
+        applySelectionGesture(prev, validIndexes, anchor, index, gesture),
+      );
+    },
+    [validIndexes],
+  );
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) =>
+      prev.size === validIndexes.length ? new Set() : new Set(validIndexes),
+    );
+  }, [validIndexes]);
+
+  const handleAdd = useCallback(async () => {
+    if (isLoading || selected.size === 0) return;
+
+    setIsLoading(true);
+    try {
+      await addProjects(selectedProjects);
+      onClose();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, selected.size, addProjects, selectedProjects, onClose]);
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !isLoading) onClose();
+      }}
+    >
+      <DialogContent
+        className="sm:max-w-lg"
+        onPointerDownOutside={(event) => {
+          if (isLoading) event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (isLoading) event.preventDefault();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {t(
+              mode === "restore"
+                ? "modManager.restoreTitle"
+                : "modManager.addingProjects",
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {t(
+              mode === "restore"
+                ? "modManager.restoreHint"
+                : "modManager.importHint",
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex h-7 items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            disabled={isLoading || validCount === 0}
+            onClick={toggleAll}
+          >
+            {t(
+              allSelected ? "modManager.clearSelection" : "modManager.selectAll",
+            )}
+          </Button>
+          {selectedDisabledCount > 0 && (
+            <label className="flex h-7 min-w-0 cursor-pointer items-center gap-2 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground">
+              <Checkbox
+                checked={enableDisabled}
+                disabled={isLoading}
+                onCheckedChange={(value) => setEnableDisabled(value === true)}
+              />
+              <span className="truncate">
+                {t("modManager.importEnableDisabled", {
+                  count: selectedDisabledCount,
+                })}
+              </span>
+            </label>
+          )}
+          <span className="ml-auto font-mono text-xs tabular-nums text-faint">
+            {selectedCount}/{validCount}
+          </span>
+        </div>
+
+        <div className="-mx-1 max-h-[21rem] min-h-0 overflow-y-auto px-1">
+          <div className="flex flex-col gap-1">
+            {projects.map((item, index) => {
+              const isValid = item.status === "valid";
+              const isDuplicate = item.status === "duplicate";
+              const isSelected = selected.has(index);
+
+              const typeKey = TYPE_KEY[item.project.projectType];
+              const meta = [
+                item.deletedReason
+                  ? t(`modManager.trashReasons.${item.deletedReason}`)
+                  : null,
+                item.fileName,
+                item.size ? formatBytes(item.size, sizeUnits, 1) : null,
+                typeKey ? t(typeKey) : null,
+                item.deletedAt
+                  ? formatDate(new Date(item.deletedAt).toISOString(), lang)
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  aria-pressed={isSelected}
+                  disabled={!isValid || isLoading}
+                  onMouseDown={preventShiftTextSelection}
+                  onClick={(event) =>
+                    toggle(index, readSelectionGesture(event, true))
+                  }
+                  className="flex h-14 w-full min-w-0 items-center gap-2.5 rounded-lg bg-surface-2 px-2.5 text-left transition-colors hover:bg-surface-3 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-surface-2"
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    disabled={!isValid || isLoading}
+                    aria-label={item.project.title}
+                    className="pointer-events-none shrink-0"
+                  />
+
+                  <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-surface-1 text-faint">
+                    <ProjectIcon
+                      src={item.project.iconUrl}
+                      size={36}
+                      fallback={<FileBox className="size-4" />}
+                    />
+                  </div>
+
+                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                    <Hint
+                      content={item.project.title}
+                      variant="text"
+                      truncatedOnly
+                    >
+                      <span className="truncate text-sm leading-4 text-foreground">
+                        {item.project.title}
+                      </span>
+                    </Hint>
+                    <Hint content={meta} variant="text" truncatedOnly>
+                      <span className="truncate text-xs leading-4 text-faint">
+                        {meta || item.project.description}
+                      </span>
+                    </Hint>
+                  </div>
+
+                  {isValid && item.disabled && !enableDisabled && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-sm bg-surface-3 px-1.5 py-0.5 text-[0.625rem] leading-3 font-medium text-muted-foreground">
+                      <PowerOff className="size-2.5" />
+                      {t("modManager.importWillBeDisabled")}
+                    </span>
+                  )}
+
+                  {isDuplicate && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-sm bg-warning/15 px-1.5 py-0.5 text-[0.625rem] leading-3 font-medium text-warning">
+                      <PackageCheck className="size-2.5" />
+                      {t("modManager.installed")}
+                    </span>
+                  )}
+
+                  {!isValid && !isDuplicate && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-sm bg-destructive/15 px-1.5 py-0.5 text-[0.625rem] leading-3 font-medium text-destructive">
+                      <CircleAlert className="size-2.5" />
+                      {t("modManager.broken")}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="secondary" onClick={onClose} disabled={isLoading}>
+            {t("common.cancel")}
+          </Button>
+
+          <Button
+            disabled={isLoading || selectedCount === 0}
+            onClick={handleAdd}
+          >
+            {isLoading && <Loader2 className="animate-spin" />}
+            {t(mode === "restore" ? "modManager.trashRestore" : "common.add")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

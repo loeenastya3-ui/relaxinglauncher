@@ -1,0 +1,30 @@
+export interface CrashRuleMessages {
+  en: string
+  ru: string
+  uk: string
+  de?: string
+  es?: string
+  fr?: string
+  pl?: string
+  pt?: string
+  tr?: string
+}
+
+export interface CrashRule {
+  id: string
+  pattern?: string
+  allPatterns?: string[]
+  flags?: string
+  exitCodes?: number[]
+  culpritPattern?: string
+  culpritFlags?: string
+  priority?: number
+  messages: CrashRuleMessages
+}
+
+export interface CrashAnalysisPayload {
+  ruleId: string
+  messages: CrashRuleMessages
+  culprits: string[]
+  reportPath: string | null
+}

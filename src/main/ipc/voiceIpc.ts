@@ -1,0 +1,55 @@
+import { app, powerSaveBlocker } from "electron";
+import { handleSafe } from "../utilities/ipc";
+import { capturePttBind, setPttBind } from "../services/PushToTalk";
+import {
+  destroyVoiceOverlay,
+  updateVoiceOverlay,
+} from "../windows/voiceOverlay";
+
+let powerSaveBlockerId: number | null = null;
+
+export function registerVoiceIpc() {
+  app.on("before-quit", destroyVoiceOverlay);
+
+  handleSafe("voice:overlayUpdate", undefined, async (_, state: unknown) => {
+    updateVoiceOverlay(state);
+  });
+
+  handleSafe(
+    "voice:setPtt",
+    false,
+    async (_, bind: { type: "key" | "mouse"; code: number } | null) => {
+      return setPttBind(bind);
+    },
+  );
+
+  handleSafe(
+    "voice:capturePttBind",
+    { reason: "unavailable" as const, bind: null },
+    async () => {
+      return await capturePttBind();
+    },
+  );
+
+  handleSafe(
+    "voice:setSessionActive",
+    undefined,
+    async (event, active: boolean) => {
+      event.sender.setBackgroundThrottling(!active);
+
+      if (active) {
+        if (
+          powerSaveBlockerId === null ||
+          !powerSaveBlocker.isStarted(powerSaveBlockerId)
+        ) {
+          powerSaveBlockerId = powerSaveBlocker.start("prevent-app-suspension");
+        }
+      } else if (powerSaveBlockerId !== null) {
+        if (powerSaveBlocker.isStarted(powerSaveBlockerId)) {
+          powerSaveBlocker.stop(powerSaveBlockerId);
+        }
+        powerSaveBlockerId = null;
+      }
+    },
+  );
+}

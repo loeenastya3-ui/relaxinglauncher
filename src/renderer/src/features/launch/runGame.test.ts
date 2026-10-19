@@ -1,0 +1,399 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const memory: Record<string, string> = {};
+const accountsSave = vi.fn(async () => {});
+const readyJava = {
+  requiredMajor: 21,
+  major: 21,
+  via: "auto",
+  source: "managed",
+  home: "C:/launcher/java/jdk-21",
+  client: "C:/launcher/java/jdk-21/bin/javaw.exe",
+  server: "C:/launcher/java/jdk-21/bin/java.exe",
+  vendor: "Temurin",
+  version: "21.0.5",
+};
+const javaPrepare = vi.fn(async (): Promise<any> => ({ ok: true, java: readyJava }));
+const getModpack = vi.fn(async (): Promise<any> => ({ status: "success", data: null }));
+
+beforeAll(() => {
+  (globalThis as any).localStorage = {
+    getItem: (key: string) => memory[key] ?? null,
+    setItem: (key: string, value: string) => {
+      memory[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete memory[key];
+    },
+  };
+  (globalThis as any).window = {
+    localStorage: (globalThis as any).localStorage,
+    api: {
+      accounts: { save: accountsSave },
+      path: { join: async (...parts: string[]) => parts.join("/") },
+      fs: { pathExists: async () => false },
+      servers: { read: async () => [] },
+      backend: { getModpack },
+      events: { onConsoleMessage: () => () => {} },
+      java: { prepare: javaPrepare },
+    },
+  };
+});
+
+vi.mock("sonner", () => {
+  const toast: any = vi.fn();
+  toast.error = vi.fn();
+  toast.success = vi.fn();
+  toast.warning = vi.fn();
+  toast.info = vi.fn();
+  toast.loading = vi.fn();
+  return { toast };
+});
+
+vi.mock("@renderer/i18n", () => ({
+  default: { t: (key: string) => key, language: "en", resolvedLanguage: "en" },
+}));
+
+vi.mock("@renderer/utilities/errorToast", () => ({
+  showErrorToast: vi.fn(),
+  recordError: vi.fn(),
+}));
+
+vi.mock("@renderer/utilities/failures", () => ({
+  showFailureToast: vi.fn(),
+  reportIpcFailure: vi.fn(),
+  pushIpcFailure: vi.fn(),
+  consumeRecentFailure: vi.fn(() => null),
+}));
+
+vi.mock("@renderer/utilities/onlineSocket", () => ({
+  isOnlineSocketConnected: () => false,
+}));
+
+vi.mock("@renderer/utilities/version", () => ({
+  checkDiffenceUpdateData: vi.fn(async () => false),
+  isOwner: () => true,
+}));
+
+vi.mock("@renderer/features/instances/openInstanceScreen", () => ({
+  openInstanceScreen: vi.fn(),
+}));
+
+type Fake = {
+  version: Record<string, any>;
+  versionPath: string;
+  ensureAuthlib: ReturnType<typeof vi.fn>;
+  run: ReturnType<typeof vi.fn>;
+  save: ReturnType<typeof vi.fn>;
+};
+
+function fakeInstance(overrides?: Partial<Fake>): Fake {
+  return {
+    version: {
+      name: "Fabulously Optimized",
+      loader: { name: "fabric", mods: [] },
+      owner: "discord_moji6416",
+      downloadedVersion: false,
+      overrides: undefined,
+    },
+    versionPath: "C:/instances/fo",
+    ensureAuthlib: vi.fn(async () => ({ ok: true })),
+    run: vi.fn(async () => true),
+    save: vi.fn(async () => {}),
+    ...overrides,
+  };
+}
+
+const account = { type: "plain", nickname: "moji6416" } as any;
+
+async function load() {
+  const [{ runGame }, atoms, launchAtoms, { getDefaultStore }] =
+    await Promise.all([
+      import("./runGame"),
+      import("@renderer/stores/atoms"),
+      import("./atoms"),
+      import("jotai"),
+    ]);
+
+  return { runGame, atoms, launchAtoms, store: getDefaultStore() };
+}
+
+describe("runGame", () => {
+  beforeEach(async () => {
+    const { atoms, store } = await load();
+    store.set(atoms.isRunningAtom, false);
+    store.set(atoms.installActiveAtom, false);
+    store.set(atoms.consolesAtom, { consoles: [] });
+    store.set(atoms.accountAtom, account);
+    store.set(atoms.accountsAtom, [account]);
+    store.set(atoms.authDataAtom, null);
+    store.set(atoms.networkAtom, true);
+    store.set(atoms.selectedVersionAtom, undefined);
+    store.set(atoms.pathsAtom, {
+      launcher: "C:/launcher",
+      minecraft: "C:/launcher/minecraft",
+      java: "C:/launcher/java",
+    });
+    accountsSave.mockClear();
+    javaPrepare.mockClear();
+    javaPrepare.mockImplementation(async () => ({ ok: true, java: readyJava }));
+    getModpack.mockReset();
+    getModpack.mockImplementation(async () => ({ status: "success", data: null }));
+  });
+
+  it("never raises the running flag when an install holds the lock", async () => {
+    const { runGame, atoms, store } = await load();
+    store.set(atoms.installActiveAtom, true);
+    const instance = fakeInstance();
+
+    await runGame({ version: instance as any });
+
+    expect(store.get(atoms.isRunningAtom)).toBe(false);
+    expect(instance.run).not.toHaveBeenCalled();
+  });
+
+  it("never raises the running flag without an instance", async () => {
+    const { runGame, atoms, store } = await load();
+
+    await runGame({});
+
+    expect(store.get(atoms.isRunningAtom)).toBe(false);
+  });
+
+  it("never raises the running flag without an account", async () => {
+    const { runGame, atoms, store } = await load();
+    store.set(atoms.accountAtom, undefined);
+
+    await runGame({ version: fakeInstance() as any });
+
+    expect(store.get(atoms.isRunningAtom)).toBe(false);
+  });
+
+  it("lowers the running flag again when authlib is unavailable", async () => {
+    const { runGame, atoms, store } = await load();
+    const instance = fakeInstance({
+      ensureAuthlib: vi.fn(async () => ({ ok: false, reason: "unavailable" })),
+    });
+
+    await runGame({ version: instance as any });
+
+    expect(store.get(atoms.isRunningAtom)).toBe(false);
+    expect(instance.run).not.toHaveBeenCalled();
+  });
+
+  it("does not start the game when the chosen Java is gone", async () => {
+    const { runGame, atoms, store } = await load();
+    javaPrepare.mockImplementation(async () => ({
+      ok: false,
+      problem: "missing",
+      java: { ...readyJava, via: "instance", source: null, client: "" },
+    }));
+    const instance = fakeInstance();
+
+    await runGame({ version: instance as any });
+
+    expect(javaPrepare).toHaveBeenCalledTimes(1);
+    expect(instance.run).not.toHaveBeenCalled();
+    expect(store.get(atoms.isRunningAtom)).toBe(false);
+  });
+
+  it("stops a Fabric-family instance whose folder ends with ! and offers a rename", async () => {
+    const { runGame, atoms, store } = await load();
+    const { toast } = await import("sonner");
+    const { openInstanceScreen } = await import(
+      "@renderer/features/instances/openInstanceScreen"
+    );
+    const { consumeRenameOffer } = await import(
+      "@renderer/features/instances/renameOffer"
+    );
+    vi.mocked(toast.error).mockClear();
+
+    const instance = fakeInstance({
+      version: {
+        ...fakeInstance().version,
+        name: "Better than Adventure!",
+        loader: { name: "bta-babric", mods: [] },
+      },
+      versionPath: "C:/launcher/minecraft/versions/Better than Adventure!",
+    });
+
+    await runGame({ version: instance as any });
+
+    expect(instance.run).not.toHaveBeenCalled();
+    expect(javaPrepare).not.toHaveBeenCalled();
+    expect(store.get(atoms.isRunningAtom)).toBe(false);
+
+    const [title, options] = vi.mocked(toast.error).mock.calls[0] as [string, any];
+    expect(title).toBe("app.jarUrlNameTitle");
+
+    options.action.onClick();
+    expect(openInstanceScreen).toHaveBeenCalledWith(instance, account);
+    expect(consumeRenameOffer(instance.versionPath)).toBe("Better than Adventure");
+  });
+
+  it("still starts a vanilla instance whose name ends with !", async () => {
+    const { runGame } = await load();
+    const instance = fakeInstance({
+      version: {
+        ...fakeInstance().version,
+        name: "ML Test!",
+        loader: { name: "vanilla", mods: [] },
+      },
+    });
+
+    await runGame({ version: instance as any });
+
+    expect(instance.run).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands the prepared Java to the instance before starting", async () => {
+    const { runGame } = await load();
+    const instance: any = fakeInstance();
+
+    await runGame({ version: instance });
+
+    expect(javaPrepare).toHaveBeenCalledWith(instance.version);
+    expect(instance.java).toEqual(readyJava);
+    expect(instance.run).toHaveBeenCalledTimes(1);
+  });
+
+  it("lowers the running flag and marks the console when the process fails", async () => {
+    const { runGame, atoms, store } = await load();
+    const instance = fakeInstance({ run: vi.fn(async () => false) });
+
+    await runGame({ version: instance as any });
+
+    expect(store.get(atoms.isRunningAtom)).toBe(false);
+    expect(store.get(atoms.consolesAtom).consoles[0].status).toBe("error");
+  });
+
+  it("leaves the running flag up after a successful start", async () => {
+    const { runGame, atoms, store } = await load();
+    const instance = fakeInstance();
+
+    await runGame({ version: instance as any });
+
+    expect(instance.run).toHaveBeenCalledTimes(1);
+    expect(store.get(atoms.isRunningAtom)).toBe(true);
+    expect(store.get(atoms.consolesAtom).consoles[0]).toMatchObject({
+      versionName: "Fabulously Optimized",
+      instance: 0,
+      status: "running",
+    });
+    expect(accountsSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the in-flight lock so the next launch is not blocked", async () => {
+    const { runGame, atoms, store } = await load();
+
+    await runGame({ version: fakeInstance() as any });
+    store.set(atoms.isRunningAtom, false);
+
+    const second = fakeInstance();
+    await runGame({ version: second as any });
+
+    expect(second.run).toHaveBeenCalledTimes(1);
+    expect(store.get(atoms.isRunningAtom)).toBe(true);
+  });
+
+  it("takes the next free instance slot", async () => {
+    const { runGame, atoms, store } = await load();
+    store.set(atoms.consolesAtom, {
+      consoles: [
+        {
+          versionName: "Fabulously Optimized",
+          instance: 0,
+          status: "running",
+          startTime: 0,
+          messages: [],
+        },
+      ],
+    });
+
+    const instance = fakeInstance();
+    await runGame({ version: instance as any });
+
+    expect(instance.run).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      null,
+      1,
+      undefined,
+    );
+  });
+
+  describe("modpack update check", () => {
+    const shareCode = "037640008ceea631e15f4e20";
+    const downloadedPack = () =>
+      fakeInstance({
+        version: {
+          ...fakeInstance().version,
+          name: "Thaumaturge Horizon",
+          shareCode,
+          downloadedVersion: true,
+          build: 15,
+        },
+      });
+
+    it("checks over HTTP while the backend answers, even with the online socket down", async () => {
+      const { runGame } = await load();
+      getModpack.mockImplementation(async () => ({
+        status: "success",
+        data: {
+          _id: shareCode,
+          shareCode,
+          build: 16,
+          conf: { loader: { mods: [] }, servers: [] },
+        },
+      }));
+      const instance = downloadedPack();
+
+      await runGame({ version: instance as any });
+
+      expect(getModpack).toHaveBeenCalledWith("", shareCode);
+      expect(instance.run).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks the player instead of starting the old build when the check fails", async () => {
+      const { runGame, atoms, launchAtoms, store } = await load();
+      const failures = await import("@renderer/utilities/failures");
+      const timeout = { cause: "timeout", code: "NET-TIMEOUT" } as any;
+      vi.mocked(failures.consumeRecentFailure).mockReturnValueOnce(timeout);
+      getModpack.mockImplementation(async () => ({ status: "error", data: null }));
+      const instance = downloadedPack();
+
+      await runGame({ version: instance as any });
+
+      expect(instance.run).not.toHaveBeenCalled();
+      expect(instance.version.shareCode).toBe(shareCode);
+      expect(store.get(atoms.isRunningAtom)).toBe(false);
+      expect(store.get(launchAtoms.launchCheckFailedAtom)).toEqual({
+        params: { version: instance, instance: 0 },
+        failure: timeout,
+      });
+      store.set(launchAtoms.launchCheckFailedAtom, null);
+    });
+
+    it("runs the installed build once the player skips the update", async () => {
+      const { runGame } = await load();
+      getModpack.mockImplementation(async () => ({ status: "error", data: null }));
+      const instance = downloadedPack();
+
+      await runGame({ version: instance as any, skipUpdate: true });
+
+      expect(getModpack).not.toHaveBeenCalled();
+      expect(instance.run).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not wait on the server while the backend is offline", async () => {
+      const { runGame, atoms, store } = await load();
+      store.set(atoms.networkAtom, false);
+      const instance = downloadedPack();
+
+      await runGame({ version: instance as any });
+
+      expect(getModpack).not.toHaveBeenCalled();
+      expect(instance.run).toHaveBeenCalledTimes(1);
+    });
+  });
+});

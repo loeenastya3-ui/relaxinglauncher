@@ -1,0 +1,47 @@
+import { ILocalAccount } from '@/types/Account'
+import { VersionInstallOptions } from '@/types/InstallationProgress'
+import { IVersionConf } from '@/types/IVersion'
+import { IServerConf } from '@/types/Server'
+
+const api = window.api
+
+export class ServerGame {
+  private account?: ILocalAccount
+  private downloadLimit: number
+  private versionPath: string
+  private serverPath: string
+  private conf: IServerConf
+  private versionConf?: IVersionConf
+
+  constructor(
+    account: ILocalAccount | undefined,
+    downloadLimit: number,
+    versionPath: string,
+    serverPath: string,
+    conf: IServerConf,
+    versionConf?: IVersionConf
+  ) {
+    this.account = account
+    this.downloadLimit = downloadLimit
+    this.versionPath = versionPath
+    this.serverPath = serverPath
+    this.conf = conf
+    this.versionConf = versionConf
+  }
+
+  async install(options?: Pick<VersionInstallOptions, 'keepProgressOpen' | 'plan'>) {
+    const result = await api.server.install(
+      this.account,
+      this.downloadLimit,
+      this.versionPath,
+      this.serverPath,
+      this.conf,
+      this.versionConf,
+      options
+    )
+
+    if (!result?.success) {
+      throw new Error(result?.error || 'Server installation failed')
+    }
+  }
+}

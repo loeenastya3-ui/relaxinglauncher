@@ -1,0 +1,57 @@
+import type { IVersionConf } from "@/types/IVersion";
+import { stripJavaOverride } from "@/shared/javaRuntime";
+
+export function getLocalPathFromFileUrl(url?: string) {
+  if (!url?.startsWith("file://")) return "";
+
+  const rawPath = url.slice("file://".length).split("?")[0];
+  const normalizedPath = /^\/[a-zA-Z]:/.test(rawPath)
+    ? rawPath.slice(1)
+    : rawPath;
+
+  try {
+    return decodeURIComponent(normalizedPath);
+  } catch {
+    return normalizedPath;
+  }
+}
+
+export function toFileUrl(filePath: string) {
+  const normalized = filePath.replace(/\\/g, "/");
+  const withLeadingSlash = /^[a-zA-Z]:/.test(normalized)
+    ? `/${normalized}`
+    : normalized.startsWith("/")
+      ? normalized
+      : `/${normalized}`;
+
+  return `file://${encodeURI(withLeadingSlash)}?t=${Date.now()}`;
+}
+
+export function sanitizeExportVersion(version: IVersionConf): IVersionConf {
+  return {
+    ...stripJavaOverride(version),
+    owner: undefined,
+    downloadedVersion: false,
+    shareCode: undefined,
+    loader: {
+      ...version.loader,
+      mods: version.loader.mods.map((mod) => ({
+        ...mod,
+        version: mod.version
+          ? {
+              ...mod.version,
+              files: mod.version.files.map((file) => {
+                const portableFile = { ...file };
+                delete portableFile.localPath;
+                if (portableFile.url?.startsWith("file://")) {
+                  portableFile.url = "";
+                }
+
+                return portableFile;
+              }),
+            }
+          : mod.version,
+      })),
+    },
+  };
+}

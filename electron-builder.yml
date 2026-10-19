@@ -1,0 +1,77 @@
+appId: com.relaxinglauncher.app
+productName: Relaxing Launcher
+
+protocols:
+  - name: Relaxing Launcher
+    schemes:
+      - relaxinglauncher
+
+directories:
+  output: dist
+  buildResources: build
+
+compression: maximum
+
+toolsets:
+  appimage: '1.0.3'
+
+electronLanguages:
+  - en-US
+  - en-GB
+  - ru
+  - uk
+
+files:
+  - '!dist/**'
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!docs/*'
+  - '!electron.vite.config.*'
+  - '!.claude/**'
+  - '!release-notes/**'
+  - '!*.tsbuildinfo'
+  - '!{eslint.config.mjs,postcss.config.js,components.json}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,vitest.config.ts}'
+  - '!**/*.{md,map}'
+  - '!**/node_modules/**/{test,tests,__tests__,example,examples,docs,coverage}/**'
+  - '!**/node_modules/**/build/Release/obj/**'
+  - '!**/node_modules/**/build/Release/*.{pdb,ipdb,iobj,exp,lib,ilk,recipe,tlog}'
+  - '!**/node_modules/**/build/*.{vcxproj,filters,sln}'
+  - '!**/node_modules/**/build/config.gypi'
+  - '!**/node_modules/uiohook-napi/{libuiohook,src}/**'
+  - '!**/node_modules/uiohook-napi/binding.gyp'
+  - '!**/node_modules/uiohook-napi/prebuilds/{darwin-arm64,darwin-x64,linux-arm64,linux-loong64,win32-arm64}/**'
+
+asarUnpack:
+  - resources/**
+
+publish:
+  provider: github
+  owner: loeenastya3-ui
+  repo: relaxinglauncher
+  vPrefixedTagName: false
+
+win:
+  target: nsis
+  artifactName: ${name}-${version}-setup.${ext}
+  executableName: Relaxing Launcher
+
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+  differentialPackage: false
+
+linux:
+  target:
+    - AppImage
+    - deb
+  maintainer: relaxinglauncher.com
+  category: Utility
+  artifactName: ${name}-${version}.${ext}
+  desktop:
+    entry:
+      StartupWMClass: relaxing-launcher

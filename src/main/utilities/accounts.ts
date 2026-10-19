@@ -1,0 +1,469 @@
+import { AccountType, IAccountConf, ILocalAccount } from "@/types/Account";
+import { jwtDecode } from "jwt-decode";
+import fs from "fs-extra";
+import path from "path";
+import { writeJsonAtomic } from "./atomicJson";
+import { getDataRoot } from "./dataRoot";
+import {
+  decodeSecret,
+  encodeSecret,
+  StoredSecrets,
+} from "./secretStore";
+
+function decodeSubject(token?: string): string | null {
+  if (!token) return null;
+  try {
+    const sub = jwtDecode<{ sub?: string }>(token).sub;
+    return typeof sub === "string" && sub.trim() !== "" ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
+function decodeLegacyRefreshToken(token?: string): string | undefined {
+  if (!token) return undefined;
+  try {
+    const value = jwtDecode<{ auth?: { refreshToken?: unknown } }>(token).auth
+      ?.refreshToken;
+    return typeof value === "string" && value.trim() !== ""
+      ? value
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+type PersistedAccount = Omit<ILocalAccount, "accessToken" | "refreshToken"> & {
+  accessToken?: string;
+  refreshToken?: string;
+};
+
+type PersistedAccountConf = {
+  accounts: PersistedAccount[];
+  lastPlayed: string | null;
+};
+
+const accountTypes: AccountType[] = ["microsoft", "plain", "elyby", "discord"];
+const persistedAccountKeys = new Set([
+  "nickname",
+  "type",
+  "image",
+  "friends",
+  "accessToken",
+  "refreshToken",
+  "id",
+]);
+const persistedFriendKeys = new Set(["id", "isMuted"]);
+
+function getLauncherDir(): string {
+  return getDataRoot();
+}
+
+function getAccountsPath(): string {
+  return path.join(getLauncherDir(), "accounts.json");
+}
+
+function getAccountSecretsPath(): string {
+  return path.join(getLauncherDir(), "accounts.secrets.json");
+}
+
+function createEmptyConfig(): IAccountConf {
+  return {
+    accounts: [],
+    lastPlayed: null,
+  };
+}
+
+function normalizeAccountType(value: unknown): AccountType {
+  return accountTypes.includes(value as AccountType)
+    ? (value as AccountType)
+    : "plain";
+}
+
+function normalizeLocalFriends(value: unknown): ILocalAccount["friends"] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((friend) => typeof friend?.id === "string")
+    .map((friend) => ({
+      id: friend.id,
+      isMuted: friend.isMuted === true,
+    }));
+}
+
+function normalizePersistedAccount(account: any): PersistedAccount {
+  const normalized: PersistedAccount = {
+    nickname: typeof account?.nickname === "string" ? account.nickname : "",
+    type: normalizeAccountType(account?.type),
+    image: typeof account?.image === "string" ? account.image : "",
+    friends: normalizeLocalFriends(account?.friends),
+  };
+
+  if (typeof account?.id === "string" && account.id.trim() !== "") {
+    normalized.id = account.id;
+  }
+
+  if (
+    typeof account?.accessToken === "string" &&
+    account.accessToken.trim() !== ""
+  ) {
+    normalized.accessToken = account.accessToken;
+  }
+
+  if (
+    typeof account?.refreshToken === "string" &&
+    account.refreshToken.trim() !== ""
+  ) {
+    normalized.refreshToken = account.refreshToken;
+  }
+
+  return normalized;
+}
+
+function hasLegacyAccountShape(account: any): boolean {
+  if (!account || typeof account !== "object") return true;
+
+  const hasExtraAccountField = Object.keys(account).some(
+    (key) => !persistedAccountKeys.has(key),
+  );
+  const hasExtraFriendField = Array.isArray(account.friends)
+    ? account.friends.some((friend) =>
+        Object.keys(friend ?? {}).some((key) => !persistedFriendKeys.has(key)),
+      )
+    : account.friends !== undefined;
+
+  return hasExtraAccountField || hasExtraFriendField;
+}
+
+export function getAccountKey(account: Pick<ILocalAccount, "type" | "nickname">): string {
+  return `${account.type}_${account.nickname}`;
+}
+
+type AccountIdentityShape = Pick<ILocalAccount, "type" | "nickname"> & {
+  id?: string;
+};
+
+export function getAccountIdentity(account: AccountIdentityShape): string {
+  const id = typeof account.id === "string" ? account.id.trim() : "";
+  return id || getAccountKey(account);
+}
+
+function matchesAccountIdentity(
+  account: AccountIdentityShape,
+  identity: string,
+): boolean {
+  return account.id === identity || getAccountKey(account) === identity;
+}
+
+function findAccountByIdentity<T extends AccountIdentityShape>(
+  accounts: T[],
+  identity: string | null,
+): T | undefined {
+  if (!identity) return undefined;
+
+  return (
+    accounts.find((account) => account.id === identity) ??
+    accounts.find((account) => getAccountKey(account) === identity)
+  );
+}
+
+function getRefreshSecretKey(key: string): string {
+  return `${key}:refresh`;
+}
+
+let accountsWriteChain: Promise<unknown> = Promise.resolve();
+
+function withAccountsLock<T>(fn: () => Promise<T>): Promise<T> {
+  const next = accountsWriteChain.then(fn, fn);
+  accountsWriteChain = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
+}
+
+export class AccountsStoreReadError extends Error {
+  constructor(filePath: string, cause: unknown) {
+    super(`Failed to read ${path.basename(filePath)}`);
+    this.name = "AccountsStoreReadError";
+    this.cause = cause;
+  }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | null)?.code === "ENOENT";
+}
+
+async function readStoredSecrets(): Promise<StoredSecrets> {
+  const secretsPath = getAccountSecretsPath();
+
+  let data: unknown;
+  try {
+    data = await fs.readJSON(secretsPath, "utf-8");
+  } catch (error) {
+    if (isMissingFileError(error)) return {};
+    throw new AccountsStoreReadError(secretsPath, error);
+  }
+
+  return typeof data === "object" && data ? (data as StoredSecrets) : {};
+}
+
+function normalizeConfig(data: Partial<PersistedAccountConf> | null | undefined): PersistedAccountConf {
+  const accounts = Array.isArray(data?.accounts)
+    ? data.accounts.map(normalizePersistedAccount)
+    : [];
+  const lastPlayed = typeof data?.lastPlayed === "string" ? data.lastPlayed : null;
+
+  return {
+    accounts,
+    lastPlayed,
+  };
+}
+
+async function writeAccountsConfig(config: IAccountConf): Promise<void> {
+  const launcherDir = getLauncherDir();
+  await fs.ensureDir(launcherDir);
+
+  const storedSecrets = await readStoredSecrets();
+  const nextSecrets: StoredSecrets = {};
+  const persistedAccounts: PersistedAccount[] = config.accounts.map((account) => {
+    const persisted = normalizePersistedAccount(account);
+    delete persisted.accessToken;
+    delete persisted.refreshToken;
+
+    const id = decodeSubject(account.accessToken) || account.id || undefined;
+    if (id) persisted.id = id;
+    else delete persisted.id;
+
+    const secretKey = id ?? getAccountKey(account);
+    const refreshKey = getRefreshSecretKey(secretKey);
+
+    const { accessToken } = account;
+    if (typeof accessToken === "string" && accessToken.trim() !== "") {
+      nextSecrets[secretKey] = encodeSecret(accessToken, "account secret");
+    } else {
+      const kept = storedSecrets[secretKey];
+      if (kept) nextSecrets[secretKey] = kept;
+    }
+
+    const refreshToken =
+      account.refreshToken ?? decodeLegacyRefreshToken(account.accessToken);
+    if (typeof refreshToken === "string" && refreshToken.trim() !== "") {
+      nextSecrets[refreshKey] = encodeSecret(refreshToken, "account secret");
+    } else {
+      const kept = storedSecrets[refreshKey];
+      if (kept) nextSecrets[refreshKey] = kept;
+    }
+
+    return persisted;
+  });
+
+  const requestedLastPlayed = config.lastPlayed ?? null;
+  const selectedIndex = requestedLastPlayed
+    ? config.accounts.findIndex(
+        (account, index) =>
+          matchesAccountIdentity(persistedAccounts[index], requestedLastPlayed) ||
+          matchesAccountIdentity(account, requestedLastPlayed),
+      )
+    : -1;
+
+  await writeJsonAtomic(getAccountSecretsPath(), nextSecrets, { mode: 0o600 });
+  await writeJsonAtomic(
+    getAccountsPath(),
+    {
+      accounts: persistedAccounts,
+      lastPlayed:
+        selectedIndex >= 0
+          ? getAccountIdentity(persistedAccounts[selectedIndex])
+          : requestedLastPlayed,
+    } satisfies PersistedAccountConf,
+    { mode: 0o600 },
+  );
+}
+
+export function saveAccountsConfig(config: IAccountConf): Promise<void> {
+  return withAccountsLock(() => writeAccountsConfig(config));
+}
+
+export function readAccountsConfig(): Promise<IAccountConf | null> {
+  return withAccountsLock(readAccountsConfigInner);
+}
+
+async function readAccountsConfigInner(): Promise<IAccountConf | null> {
+  const accountsPath = getAccountsPath();
+
+  let data: any;
+  try {
+    data = await fs.readJSON(accountsPath, "utf-8");
+  } catch (error) {
+    if (isMissingFileError(error)) return null;
+    throw new AccountsStoreReadError(accountsPath, error);
+  }
+
+  const hasLegacyShape = Array.isArray(data?.accounts)
+    ? data.accounts.some(hasLegacyAccountShape)
+    : false;
+  const raw = normalizeConfig(data);
+  const secrets = await readStoredSecrets();
+
+  let shouldMigrate = false;
+  const hydratedAccounts = raw.accounts.map((account) => {
+    const idKey = account.id;
+    const secretKey = idKey || getAccountKey(account);
+
+    let accessToken = decodeSecret(secrets[secretKey]);
+    let refreshToken = decodeSecret(secrets[getRefreshSecretKey(secretKey)]);
+
+    if (
+      !accessToken &&
+      typeof account.accessToken === "string" &&
+      account.accessToken.trim() !== ""
+    ) {
+      accessToken = account.accessToken;
+      shouldMigrate = true;
+    }
+
+    if (
+      !refreshToken &&
+      typeof account.refreshToken === "string" &&
+      account.refreshToken.trim() !== ""
+    ) {
+      refreshToken = account.refreshToken;
+      shouldMigrate = true;
+    }
+
+    if (!refreshToken) {
+      refreshToken = decodeLegacyRefreshToken(accessToken);
+      if (refreshToken) shouldMigrate = true;
+    }
+
+    const resolvedId = decodeSubject(accessToken) || idKey || undefined;
+    if (resolvedId && resolvedId !== idKey) shouldMigrate = true;
+
+    const hydrated: ILocalAccount = { ...account };
+    if (resolvedId) hydrated.id = resolvedId;
+    if (accessToken) hydrated.accessToken = accessToken;
+    if (refreshToken) hydrated.refreshToken = refreshToken;
+
+    return hydrated;
+  });
+
+  const config: IAccountConf = {
+    accounts: hydratedAccounts,
+    lastPlayed: raw.lastPlayed,
+  };
+
+  if (
+    shouldMigrate ||
+    hasLegacyShape ||
+    raw.accounts.some(
+      (account) =>
+        typeof account.accessToken === "string" &&
+        account.accessToken.trim() !== "",
+    ) ||
+    raw.accounts.some(
+      (account) =>
+        typeof account.refreshToken === "string" &&
+        account.refreshToken.trim() !== "",
+    )
+  ) {
+    await writeAccountsConfig(config);
+  }
+
+  return config;
+}
+
+function getTokenExpiry(token?: string): number {
+  if (!token) return -1;
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1] || "", "base64url").toString("utf8"),
+    );
+    return typeof payload?.exp === "number" ? payload.exp : -1;
+  } catch {
+    return -1;
+  }
+}
+
+function getAccountSubject(token?: string): string | null {
+  if (!token) return null;
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1] || "", "base64url").toString("utf8"),
+    );
+    return typeof payload?.sub === "string" ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+// The renderer saves the whole array from its own memory, so a save that raced
+// a background refresh in main used to write the already-rotated token back.
+// Whichever copy carries the later expiry wins.
+export function mergeIncomingAccounts(
+  stored: ILocalAccount[],
+  incoming: ILocalAccount[],
+): ILocalAccount[] {
+  return incoming.map((account) => {
+    const subject = getAccountSubject(account.accessToken);
+    if (!subject) return account;
+
+    const storedAccount = stored.find(
+      (entry) => getAccountSubject(entry.accessToken) === subject,
+    );
+    if (!storedAccount) return account;
+
+    if (
+      getTokenExpiry(storedAccount.accessToken) <=
+      getTokenExpiry(account.accessToken)
+    ) {
+      return account;
+    }
+
+    return {
+      ...account,
+      nickname: storedAccount.nickname,
+      accessToken: storedAccount.accessToken,
+      refreshToken: storedAccount.refreshToken,
+    };
+  });
+}
+
+export function mutateAccountsConfig(
+  mutator: (
+    config: IAccountConf,
+  ) => IAccountConf | null | Promise<IAccountConf | null>,
+): Promise<IAccountConf | null> {
+  return withAccountsLock(async () => {
+    const current = (await readAccountsConfigInner()) ?? createEmptyConfig();
+    const next = await mutator(current);
+    if (next) await writeAccountsConfig(next);
+    return next;
+  });
+}
+
+export async function loadAccountsConfig(): Promise<IAccountConf> {
+  const config = (await readAccountsConfig()) ?? createEmptyConfig();
+  const selected = findAccountByIdentity(config.accounts, config.lastPlayed);
+  if (!selected) return config;
+
+  return { ...config, lastPlayed: getAccountKey(selected) };
+}
+
+export async function getSelectedAccount(): Promise<ILocalAccount | null> {
+  const config = await readAccountsConfig().catch(() => null);
+  if (!config?.accounts?.length) return null;
+
+  const selected = findAccountByIdentity(config.accounts, config.lastPlayed);
+  if (selected) return selected;
+
+  return config.accounts[0] ?? null;
+}
+
+export async function getSelectedAccessToken(): Promise<string | null> {
+  const selected = await getSelectedAccount();
+  if (!selected?.accessToken) return null;
+  return selected.accessToken;
+}

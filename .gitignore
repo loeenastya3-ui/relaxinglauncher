@@ -1,0 +1,14 @@
+node_modules
+dist
+out
+.DS_Store
+*.log*
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+*.tsbuildinfo
+.*
+!.gitignore
+!.github

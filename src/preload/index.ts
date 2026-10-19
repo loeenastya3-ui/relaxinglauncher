@@ -1,0 +1,2709 @@
+/// <reference lib="dom" />
+import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { createPathUtils } from "./path";
+import { IServer } from "@/types/ServersList";
+import type {
+  JournalStatus,
+  JournalUiEntry,
+  LaunchStalledPayload,
+  SupportReportHistoryItem,
+  SupportReportPrepared,
+  SupportReportRequest,
+  SupportReportSendResult,
+} from "@/types/Journal";
+import type { ServerPingResult } from "../main/utilities/serverPing";
+import type {
+  ModrinthServerImage,
+  ModrinthServerPack,
+  ModrinthServerPage,
+  ModrinthServerQuery,
+} from "@/types/ModrinthServers";
+import {
+  IImportModpack,
+  IVersion,
+  IVersionClassData,
+  IVersionConf,
+  IJarMod,
+  IJarModSet,
+  VersionDeleteResult,
+} from "@/types/IVersion";
+import { IAccountConf, IAuth, ILocalAccount } from "@/types/Account";
+import type {
+  JavaAddResult,
+  JavaOverride,
+  JavaPrepareResult,
+  JavaRuntimeList,
+} from "@/shared/javaRuntime";
+import {
+  IExplorePage,
+  IExploreQuery,
+  IModpack,
+  IModpackUpdate,
+  UploadFileProgress,
+} from "@/types/Backend";
+import { IPublicProfile } from "@/types/Profile";
+import type {
+  INicknameStatus,
+  NicknameAvailability,
+  NicknameChangeResult,
+} from "@/types/Nickname";
+import {
+  IFriendSettingsUpdate,
+  IMutualFriends,
+  INotificationPrefs,
+  IUpdateUser,
+  IUser,
+} from "@/types/IUser";
+import { IGroup, IVoiceTokenResponse, VoiceOverlayState } from "@/types/Voice";
+import { INews, INewsPage, ISponsoredNewsAd } from "@/types/News";
+import { IUpdateCheckRequest, IUpdateCheckResponse } from "@/types/Updates";
+import {
+  IAchievementReach,
+  IGlobalLeaderboard,
+  IOwnLeaderboardRank,
+} from "@/types/Leaderboard";
+import {
+  CatalogListParams,
+  CatalogListResult,
+  ICatalogSkin,
+  MyCommunityResult,
+  PublishCommunityResult,
+  SkinsData,
+} from "@/types/SkinManager";
+import { LoaderVersion } from "@/types/VersionsService";
+import {
+  AgentChatSummary,
+  AgentStoredChat,
+  AgentStreamEvent,
+  AgentStreamRequest,
+  AgentSyncPush,
+  AgentSyncResult,
+  AiModelInfo,
+  AgentBuiltinStatus,
+  AiProviderInput,
+  AiProvidersState,
+  AiProviderTestResult,
+  RemoteAiChatMessage,
+} from "@/types/Agent";
+import { DownloadSource, TSettings, VoicePttCapture } from "@/types/Settings";
+import { MirrorState } from "@/shared/mirrorMode";
+import {
+  IServerConf,
+  IServerOption,
+  IServerSettings,
+  ServerCore,
+  ServerRunResult,
+  ServerRunStatePayload,
+  ServerRunStatus,
+  ServerSyncNotice,
+} from "@/types/Server";
+import {
+  DownloaderFailuresInfo,
+  DownloaderInfo,
+  DownloadItem,
+} from "@/types/Downloader";
+import { Loader } from "@/types/Loader";
+import {
+  IFilterGroup,
+  ILocalFileInfo,
+  ILocalIdentifyRequest,
+  ILocalIdentifyResult,
+  IProject,
+  ISearchData,
+  IVersionDependency,
+  ProjectType,
+  Provider,
+  IVersion as IVersionModManager,
+  IModpack as IModpackModManager,
+  IModpackExtraFile,
+  ILocalProject,
+} from "@/types/ModManager";
+import type {
+  ModpackApplyResult,
+  ModpackBase,
+  ModpackBaseInput,
+  ModpackFilesPlan,
+  ModpackRollback,
+  ModpackRollbackInfo,
+} from "@/types/ModpackSource";
+import { ISkinData } from "@/types/Skin";
+import {
+  IWorld,
+  IWorldStatsAggregate,
+  WorldDuplicateResult,
+  WorldExportResult,
+  WorldImportResult,
+} from "@/types/World";
+import {
+  IWorldBackupList,
+  WorldBackupCreateResult,
+  WorldBackupDeleteResult,
+  WorldBackupProgress,
+  WorldBackupRestoreResult,
+} from "@/types/WorldBackup";
+import { ArchiveExtractProgress } from "@/types/Archive";
+import {
+  ChunkEditResult,
+  IChunkDetails,
+  IChunkDimension,
+  IChunkEditOptions,
+  IChunkRegion,
+  IChunkRegionScan,
+} from "@/types/WorldChunks";
+import {
+  IAchievementStatsResult,
+  IRemoteWorldStatsResponse,
+} from "@/types/Achievements";
+import { AuthlibEnsureResult } from "@/types/IAuthlib";
+import { IAuthResponse, IRefreshTokenResponse } from "@/types/Auth";
+import {
+  ActiveFriendShare,
+  ResolvedFriendShareConnection,
+  ShareCommandResult,
+  SharePeerInfo,
+  ShareState,
+  ShareStateError,
+  ShareVisibility,
+} from "@/types/Share";
+import { RpcRendererContext } from "@/types/Rpc";
+import {
+  LoaderChangeResult,
+  VersionInstallOptions,
+  VersionInstallProgress,
+  VersionInstallResult,
+} from "@/types/InstallationProgress";
+import type { LoaderRequirementsScan } from "@/shared/loaderCompat";
+import type { OrnitheModsCheck } from "@/shared/profileLoaders";
+import { NotificationClickAction } from "@/types/Notification";
+import { LauncherDeepLink } from "@/types/DeepLink";
+import type { FailureInfo } from "@/shared/errors";
+import {
+  ConnectivityCheckPlanEntry,
+  ConnectivityCheckResult,
+} from "@/types/Connectivity";
+import { CrashAnalysisPayload } from "@/types/CrashAnalysis";
+import {
+  GameLogKind,
+  IGameLogContent,
+  IGameLogDiagnosis,
+  IGameLogFile,
+} from "@/types/GameLog";
+import {
+  IAiAnalysisResult,
+  IAiFeedbackResult,
+  IAiLogRequest,
+  ICrashUnresolvedPayload,
+} from "@/types/AiAnalysis";
+import {
+  ILauncherReleaseNote,
+  ILauncherReleasePage,
+} from "@/types/LauncherRelease";
+import { IPlaytimeSyncEntry } from "@/types/VersionStatistics";
+import {
+  StorageBreakdown,
+  StorageCleanupKind,
+  StorageClearResult,
+} from "@/types/Storage";
+import { BlessedPathInfo } from "@/types/AllowedPath";
+import type { TrayAction, TrayCommand, TrayModel } from "@/types/Tray";
+import type { AppUpdateState } from "@/types/AppUpdate";
+import type {
+  DataLocationApplyResult,
+  DataLocationInfo,
+  DataLocationPlan,
+  DataLocationWindowAction,
+  DataLocationWindowState,
+} from "@/types/DataLocation";
+import {
+  IPC_FAILURE_TOKEN_CHANNEL,
+  IpcFailurePayload,
+  readIpcFailureEnvelope,
+} from "@/shared/ipcFailureEnvelope";
+
+export type UpdaterStatus =
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "not-available"
+  | "error";
+
+export interface UpdaterProgress {
+  percent: number;
+  bytesPerSecond: number;
+  transferred: number;
+  total: number;
+}
+
+export interface UpdaterStatusPayload {
+  status: UpdaterStatus;
+  version?: string;
+  message?: string;
+}
+
+const LEGACY_MIGRATION_MARKER = "relaxing:legacyLocalStorageMigrated";
+
+if (window.location.protocol === "app:") {
+  try {
+    if (window.localStorage.getItem(LEGACY_MIGRATION_MARKER) === null) {
+      const legacyDump = ipcRenderer.sendSync(
+        "migration:legacyLocalStorage",
+      ) as Record<string, string> | null;
+
+      if (legacyDump) {
+        for (const [key, value] of Object.entries(legacyDump)) {
+          if (window.localStorage.getItem(key) === null) {
+            window.localStorage.setItem(key, String(value));
+          }
+        }
+      }
+
+      window.localStorage.setItem(LEGACY_MIGRATION_MARKER, "1");
+    }
+  } catch {}
+}
+
+const pendingDeepLinks: LauncherDeepLink[] = [];
+const deepLinkSubscribers = new Set<(payload: LauncherDeepLink) => void>();
+
+ipcRenderer.on(
+  "app:deepLink",
+  (_event: Electron.IpcRendererEvent, payload: LauncherDeepLink) => {
+    if (deepLinkSubscribers.size === 0) {
+      pendingDeepLinks.push(payload);
+      return;
+    }
+
+    deepLinkSubscribers.forEach((callback) => callback(payload));
+  },
+);
+
+interface UpdateFailedPayload {
+  message: string;
+  reason?: "loop";
+  version?: string;
+  path?: string;
+}
+
+const pendingUpdateFailures: UpdateFailedPayload[] = [];
+const updateFailedSubscribers = new Set<
+  (payload: UpdateFailedPayload) => void
+>();
+
+ipcRenderer.on(
+  "app:updateFailed",
+  (_event: Electron.IpcRendererEvent, payload: UpdateFailedPayload) => {
+    if (updateFailedSubscribers.size === 0) {
+      pendingUpdateFailures.push(payload);
+      return;
+    }
+
+    updateFailedSubscribers.forEach((callback) => callback(payload));
+  },
+);
+
+export interface IElectronAPI {
+  platform: string;
+  os: {
+    totalmem: () => Promise<number>;
+  };
+  java: {
+    list: (rescan?: boolean) => Promise<JavaRuntimeList>;
+    add: () => Promise<JavaAddResult>;
+    remove: (home: string) => Promise<JavaRuntimeList>;
+    setDefault: (
+      major: number,
+      home: string | null,
+    ) => Promise<JavaRuntimeList | null>;
+    prepare: (conf: IVersionConf) => Promise<JavaPrepareResult>;
+    ensure: (
+      requiredMajor: number,
+      override: JavaOverride | null,
+    ) => Promise<JavaPrepareResult>;
+  };
+  storage: {
+    getBreakdown: () => Promise<StorageBreakdown>;
+    clearCache: () => Promise<StorageClearResult>;
+    cleanup: (
+      kind: StorageCleanupKind,
+      names?: string[],
+    ) => Promise<StorageClearResult>;
+  };
+  dataLocation: {
+    get: () => Promise<DataLocationInfo>;
+    pick: () => Promise<DataLocationPlan | null>;
+    planDefault: () => Promise<DataLocationPlan | null>;
+    apply: (kind: "move" | "adopt") => Promise<DataLocationApplyResult>;
+  };
+  dataLocationWindow: {
+    getState: () => Promise<DataLocationWindowState | null>;
+    action: (action: DataLocationWindowAction) => Promise<void>;
+    onState: (callback: (state: DataLocationWindowState) => void) => () => void;
+  };
+  path: {
+    join: (...args: string[]) => string;
+    basename: (filePath: string, suffix?: string) => string;
+    extname: (filePath: string) => string;
+  };
+  fs: {
+    readFile: (filePath: string, encoding: BufferEncoding) => Promise<string>;
+    readFileBuffer: (target: string) => Promise<Uint8Array | null>;
+    rimraf: (targetPath: string) => Promise<boolean>;
+    ensure: (dirPath: string) => Promise<boolean>;
+    copy: (src: string, dest: string) => Promise<boolean>;
+    writeFile: (
+      filePath: string,
+      data: string | Uint8Array,
+      encoding?: BufferEncoding,
+    ) => Promise<boolean>;
+    pathExists: (targetPath: string) => Promise<boolean>;
+    readdirWithTypes: (
+      folderPath: string,
+    ) => Promise<{ path: string; type: "file" | "folder" }[]>;
+    sha1: (filePath: string) => Promise<string>;
+    readdir: (dirPath: string) => Promise<string[]>;
+    extractZip: (zipPath: string, destination: string) => Promise<boolean>;
+    rename: (oldPath: string, newPath: string) => Promise<boolean>;
+    writeJSON: (filePath: string, data: any) => Promise<boolean>;
+    writeJSONSync: (filePath: string, data: any) => string;
+    readJSON: <T>(
+      filePath: string,
+      encoding?: BufferEncoding,
+    ) => Promise<T | null>;
+    getDirectories: (source: string) => Promise<string[]>;
+  };
+  clipboard: {
+    writeText: (text: string) => Promise<boolean>;
+    writeImage: (path: string) => Promise<boolean>;
+    writeImageData: (bytes: Uint8Array) => Promise<boolean>;
+  };
+  media: {
+    fetchImage: (
+      url: string,
+    ) => Promise<{ bytes: Uint8Array; type: string } | null>;
+    saveImage: (
+      url: string,
+      name: string,
+    ) => Promise<"saved" | "cancelled" | "failed">;
+    showSaved: () => Promise<void>;
+  };
+  edit: {
+    run: (command: "cut" | "copy" | "paste" | "selectAll") => Promise<void>;
+  };
+  shell: {
+    openExternal: (url: string) => Promise<void>;
+    openPath: (path: string) => Promise<void>;
+    trashItem: (path: string) => Promise<boolean>;
+    showItemInFolder: (path: string) => Promise<void>;
+  };
+  file: {
+    archiveFiles: (
+      filesToArchive: string[],
+      zipPath: string,
+      basePath?: string,
+    ) => Promise<boolean>;
+    archiveForPublish: (
+      filesToArchive: string[],
+      zipPath: string,
+      basePath?: string,
+    ) => Promise<boolean>;
+    getTotalSizes: (filePaths: string[]) => Promise<number | null>;
+    fromBuffer: (data: ArrayBuffer) => string;
+    download(items: DownloadItem[], limit: number): Promise<boolean>;
+  };
+  servers: {
+    write: (servers: IServer[], filePath: string) => Promise<boolean>;
+    versions: (versions: IVersionConf[]) => Promise<
+      {
+        version: string;
+        servers: any[];
+        path: string;
+      }[]
+    >;
+    get: (version: string, loader: Loader) => Promise<IServerOption[]>;
+    read: (path: string) => Promise<IServer[]>;
+    compare: (servers1: IServer[], servers2: IServer[]) => Promise<boolean>;
+    ping: (address: string) => Promise<ServerPingResult>;
+    discover: (query: ModrinthServerQuery) => Promise<ModrinthServerPage>;
+    discoverPack: (
+      projectId: string,
+      versionId: string,
+    ) => Promise<ModrinthServerPack | null>;
+    discoverGallery: (projectId: string) => Promise<ModrinthServerImage[] | null>;
+  };
+  version: {
+    import: (filePath: string, tempPath: string) => Promise<IImportModpack>;
+    duplicate: (
+      sourceName: string,
+      targetName: string,
+    ) => Promise<IVersionConf | null>;
+    init: (versionConf: IVersionConf) => Promise<IVersionClassData>;
+    install: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      extraItems?: DownloadItem[],
+      options?: VersionInstallOptions,
+    ) => Promise<VersionInstallResult>;
+    changeLoader: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      targetId: string,
+    ) => Promise<LoaderChangeResult>;
+    loaderRequirements: (
+      versionPath: string,
+      loader: Loader,
+    ) => Promise<LoaderRequirementsScan | null>;
+    importJarMods: (
+      versionPath: string,
+      filePaths: string[],
+    ) => Promise<IJarMod[] | null>;
+    removeJarMod: (versionPath: string, file: string) => Promise<boolean>;
+    jarModFiles: (versionPath: string) => Promise<string[]>;
+    syncJarMods: (versionPath: string, jar: IJarModSet) => Promise<boolean>;
+    checkOrnitheMods: (
+      versionPath: string,
+      minecraftVersion: string,
+    ) => Promise<OrnitheModsCheck | null>;
+    cancelInstall: () => Promise<boolean>;
+    pauseInstall: () => Promise<boolean>;
+    resumeInstall: () => Promise<boolean>;
+    getPauseState: () => Promise<"off" | "pending" | "held">;
+    ensureAuthlib: (
+      account: ILocalAccount,
+      versionConf: IVersionConf,
+    ) => Promise<AuthlibEnsureResult>;
+    getRunCommand: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      authData: IAuth | null,
+      isRelative: boolean,
+      quick?: { single?: string; multiplayer?: string },
+    ) => Promise<string[] | null>;
+    run: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      authData: IAuth | null,
+      instance: number,
+      quick: { single?: string; multiplayer?: string },
+    ) => Promise<boolean>;
+    delete: (
+      account: ILocalAccount,
+      versionConf: IVersionConf,
+      isFull: boolean,
+    ) => Promise<VersionDeleteResult | false>;
+    save: (versionConf: IVersionConf) => Promise<boolean>;
+    share: {
+      uploadMods: (
+        at: string,
+        versionConf: IVersionConf,
+      ) => Promise<{
+        mods: ILocalProject[];
+        success: boolean;
+        uploaded: number;
+        failures: string[];
+      }>;
+      uploadJarMods: (
+        at: string,
+        versionPath: string,
+        shareCode: string,
+        jar: IJarModSet,
+      ) => Promise<IJarModSet | null>;
+    };
+  };
+  accounts: {
+    load: () => Promise<IAccountConf | null>;
+    save: (
+      accounts: IAccountConf["accounts"],
+      lastPlayed: string | null,
+    ) => Promise<boolean>;
+  };
+  auth: {
+    microsoft: (
+      code: string,
+      codeVerifier?: string,
+    ) => Promise<IAuthResponse | null>;
+    microsoftRefresh: (
+      refreshToken: string,
+      id: string,
+    ) => Promise<IRefreshTokenResponse | null>;
+    elyby: (code: string) => Promise<IAuthResponse | null>;
+    elybyRefresh: (
+      refreshToken: string,
+      id: string,
+    ) => Promise<IRefreshTokenResponse | null>;
+    discord: (code: string) => Promise<IAuthResponse | null>;
+    discordRefresh: (
+      refreshToken: string,
+      id: string,
+    ) => Promise<IRefreshTokenResponse | null>;
+    startServer: (expectedState: string) => Promise<{
+      code: string;
+      provider: "microsoft" | "discord" | "elyby" | "twitch" | "github";
+    }>;
+    stopServer: () => Promise<boolean>;
+  };
+  backend: {
+    getModpack: (
+      at: string,
+      code: string,
+    ) => Promise<{
+      status: "error" | "success" | "not_found";
+      data: IModpack | null;
+    }>;
+    getOwnModpacks: (at: string) => Promise<IModpack[] | null>;
+    exploreModpacks: (query: IExploreQuery) => Promise<IExplorePage | null>;
+    getPublicProfile: (
+      nickname: string,
+      userId?: string,
+    ) => Promise<IPublicProfile | null>;
+    shareModpack: (
+      at: string,
+      modpack: { conf: IModpack["conf"]; isPublic?: boolean },
+    ) => Promise<string | null>;
+    updateModpack: (
+      at: string,
+      shareCode: string,
+      update: IModpackUpdate,
+    ) => Promise<boolean>;
+    deleteModpack: (at: string, shareCode: string) => Promise<boolean>;
+    updateUser: (
+      at: string,
+      id: string,
+      user: IUpdateUser,
+    ) => Promise<IUser | null>;
+    getUser: (at: string, id: string) => Promise<IUser | null>;
+    getMutualFriends: (
+      at: string,
+      id: string,
+    ) => Promise<IMutualFriends | null>;
+    getRemoteStats: (at: string) => Promise<IRemoteWorldStatsResponse>;
+    groupsList: (at: string) => Promise<IGroup[] | null>;
+    groupCreate: (at: string, name: string) => Promise<IGroup | null>;
+    groupRename: (
+      at: string,
+      groupId: string,
+      name: string,
+    ) => Promise<IGroup | null>;
+    groupDelete: (at: string, groupId: string) => Promise<boolean>;
+    groupJoinVoice: (
+      at: string,
+      groupId: string,
+    ) => Promise<IVoiceTokenResponse | null>;
+    groupJoinByCode: (
+      at: string,
+      code: string,
+    ) => Promise<
+      | IGroup
+      | "banned"
+      | "group_full"
+      | "rate_limited"
+      | "not_found"
+      | "invalid_code"
+      | null
+    >;
+    groupLeave: (at: string, groupId: string) => Promise<boolean>;
+    groupKickMember: (
+      at: string,
+      groupId: string,
+      memberId: string,
+    ) => Promise<boolean>;
+    groupBanMember: (
+      at: string,
+      groupId: string,
+      memberId: string,
+    ) => Promise<boolean>;
+    groupUnbanMember: (
+      at: string,
+      groupId: string,
+      memberId: string,
+    ) => Promise<boolean>;
+    groupTransferOwner: (
+      at: string,
+      groupId: string,
+      memberId: string,
+    ) => Promise<boolean>;
+    groupResetCode: (at: string, groupId: string) => Promise<IGroup | null>;
+    resetFriendCode: (at: string, id: string) => Promise<IUser | null>;
+    getNicknameStatus: (
+      at: string,
+      id: string,
+    ) => Promise<INicknameStatus | null>;
+    checkNickname: (
+      at: string,
+      id: string,
+      name: string,
+    ) => Promise<NicknameAvailability | null>;
+    changeNickname: (
+      at: string,
+      id: string,
+      nickname: string,
+    ) => Promise<NicknameChangeResult | null>;
+    resetNickname: (
+      at: string,
+      id: string,
+    ) => Promise<NicknameChangeResult | null>;
+    updateFriendSettings: (
+      at: string,
+      id: string,
+      settings: IFriendSettingsUpdate,
+    ) => Promise<IUser | null>;
+    uploadFileFromPath: (
+      at: string,
+      filePath: string,
+      fileName?: string,
+      folder?: string,
+      progressId?: string,
+      direct?: boolean,
+    ) => Promise<string | null>;
+    onUploadFileProgress: (
+      callback: (progress: UploadFileProgress) => void,
+    ) => () => void;
+    deleteFile: (
+      at: string,
+      key: string,
+      isDirectory?: boolean,
+    ) => Promise<boolean>;
+    modpackDownloaded: (at: string, shareCode: string) => Promise<boolean>;
+    getNews: () => Promise<INews[]>;
+    getNewsPage: (params: {
+      limit?: number;
+      cursor?: string;
+      source?: string;
+    }) => Promise<INewsPage | null>;
+    checkUpdates: (
+      request: IUpdateCheckRequest,
+    ) => Promise<IUpdateCheckResponse | null>;
+    getGlobalLeaderboard: (limit: number) => Promise<IGlobalLeaderboard | null>;
+    getOwnLeaderboardRank: (at: string) => Promise<IOwnLeaderboardRank | null>;
+    getAchievementReach: () => Promise<IAchievementReach | null>;
+    getWhatsNew: (
+      version: string,
+      locale: string,
+    ) => Promise<ILauncherReleaseNote | null>;
+    getLauncherReleases: (
+      locale: string,
+      limit: number,
+    ) => Promise<ILauncherReleasePage | null>;
+    getSponsoredNewsAd: (
+      locale: string,
+      hiddenIds: string[],
+    ) => Promise<ISponsoredNewsAd | null>;
+    recordSponsoredAdImpression: (id: string) => Promise<boolean>;
+    recordSponsoredAdClick: (id: string) => Promise<boolean>;
+    approveSiteLogin: (at: string, requestId: string) => Promise<boolean>;
+    declineSiteLogin: (at: string, requestId: string) => Promise<boolean>;
+    discordLink: (
+      at: string,
+      code: string,
+    ) => Promise<{ discordId: string; username: string } | null>;
+    discordUnlink: (at: string) => Promise<{ discordId: null } | null>;
+    telegramLinkStart: (
+      at: string,
+    ) => Promise<{ botUrl: string; expiresAt: string } | null>;
+    telegramUnlink: (
+      at: string,
+    ) => Promise<{ provider: string; linked: null } | null>;
+    updateNotifications: (
+      at: string,
+      id: string,
+      prefs: Partial<INotificationPrefs>,
+    ) => Promise<IUser | null>;
+    apiBaseUrl: () => Promise<string>;
+    onApiBaseUrl: (callback: (baseUrl: string) => void) => () => void;
+    aiComplete: (at: string, prompt: string) => Promise<string | null>;
+    checkHealth: () => Promise<boolean>;
+  };
+  voice: {
+    setPtt: (
+      bind: { type: "key" | "mouse"; code: number } | null,
+    ) => Promise<boolean>;
+    capturePttBind: () => Promise<VoicePttCapture>;
+    setSessionActive: (active: boolean) => Promise<void>;
+    onPttDown: (callback: () => void) => () => void;
+    onPttUp: (callback: () => void) => () => void;
+    updateOverlay: (state: VoiceOverlayState) => Promise<void>;
+    onOverlayState: (
+      callback: (state: VoiceOverlayState) => void,
+    ) => () => void;
+  };
+  versions: {
+    getList: (
+      loader: Loader,
+      includeSnapshots?: boolean,
+    ) => Promise<IVersion[] | null>;
+    getLoaderVersions: (
+      loader: Exclude<Loader, "vanilla">,
+      versionId: string,
+    ) => Promise<LoaderVersion[] | null>;
+  };
+  game: {
+    closeGame: (versionName: string, instance: number) => Promise<boolean>;
+  };
+  journal: {
+    write: (entries: JournalUiEntry[]) => void;
+    status: () => Promise<JournalStatus | null>;
+    setVerbose: (minutes: number | null) => Promise<number | null>;
+    openFolder: () => Promise<boolean>;
+  };
+  support: {
+    prepare: (
+      request: SupportReportRequest,
+    ) => Promise<SupportReportPrepared | null>;
+    send: (
+      id: string,
+      accessToken?: string | null,
+    ) => Promise<SupportReportSendResult>;
+    save: (id: string) => Promise<string | null>;
+    history: () => Promise<SupportReportHistoryItem[]>;
+  };
+  logs: {
+    list: (versionPath: string) => Promise<IGameLogFile[]>;
+    read: (
+      versionPath: string,
+      name: string,
+      kind: GameLogKind,
+    ) => Promise<IGameLogContent | null>;
+    analyze: (
+      versionPath: string,
+      name: string,
+      kind: GameLogKind,
+      exitCode?: number,
+    ) => Promise<IGameLogDiagnosis | null>;
+  };
+  mods: {
+    check: (
+      settings: TSettings,
+      versionConf: IVersionConf,
+      server?: IServerConf,
+      options?: VersionInstallOptions,
+    ) => Promise<VersionInstallResult>;
+    downloadOther: (
+      settings: TSettings,
+      versionConf: IVersionConf,
+      options?: VersionInstallOptions,
+    ) => Promise<VersionInstallResult>;
+    syncLive: (
+      settings: TSettings,
+      versionConf: IVersionConf,
+      options?: VersionInstallOptions,
+    ) => Promise<VersionInstallResult>;
+    cancelInstall: () => Promise<boolean>;
+  };
+  other: {
+    getVersion: () => Promise<string>;
+    openFileDialog: (
+      isFolder?: boolean,
+      filters?: { name: string; extensions: string[] }[],
+      multi?: boolean,
+    ) => Promise<string[]>;
+    getPathForFile: (file: File) => string;
+    gameTextures: (
+      names: string[],
+    ) => Promise<{ version: string; files: Record<string, Uint8Array> } | null>;
+    getPaths: () => Promise<{
+      launcher: string;
+      minecraft: string;
+      java: string;
+      skins: string;
+    }>;
+    getPath: (
+      pathKey:
+        | "home"
+        | "appData"
+        | "userData"
+        | "sessionData"
+        | "temp"
+        | "exe"
+        | "module"
+        | "desktop"
+        | "documents"
+        | "downloads"
+        | "music"
+        | "pictures"
+        | "videos"
+        | "recent"
+        | "logs"
+        | "crashDumps",
+    ) => Promise<string>;
+    notify: (
+      options: Electron.NotificationConstructorOptions,
+      clickAction?: NotificationClickAction,
+    ) => Promise<void>;
+    getLocale: () => Promise<string>;
+    restoreWindow: () => Promise<void>;
+    setUnsavedGuard: (value: boolean) => Promise<void>;
+    confirmClose: () => Promise<void>;
+    onCloseRequested: (
+      callback: (reason: {
+        unsaved: boolean;
+        servers: boolean;
+        install: boolean;
+      }) => void,
+    ) => () => void;
+    onNotificationClick: (
+      callback: (action: NotificationClickAction) => void,
+    ) => () => void;
+  };
+  allowedPaths: {
+    list: () => Promise<BlessedPathInfo[]>;
+    revoke: (target: string) => Promise<boolean>;
+  };
+  tray: {
+    update: (model: TrayModel) => Promise<void>;
+    onAction: (callback: (action: TrayAction) => void) => () => void;
+  };
+  trayPopup: {
+    getModel: () => Promise<TrayModel | null>;
+    run: (command: TrayCommand) => Promise<void>;
+    resize: (height: number) => Promise<void>;
+    hide: () => Promise<void>;
+    reveal: () => Promise<void>;
+    onModel: (callback: (model: TrayModel) => void) => () => void;
+    onShown: (callback: () => void) => () => void;
+  };
+  appUpdate: {
+    getState: () => Promise<AppUpdateState>;
+    install: () => Promise<boolean>;
+    onState: (callback: (state: AppUpdateState) => void) => () => void;
+  };
+  streamer: {
+    watch: (enabled: boolean) => Promise<string | null>;
+    onDetected: (callback: (app: string | null) => void) => () => void;
+  };
+  system: {
+    getLaunchAtLogin: () => Promise<{ supported: boolean; enabled: boolean }>;
+    setLaunchAtLogin: (
+      enabled: boolean,
+    ) => Promise<{ supported: boolean; enabled: boolean }>;
+  };
+  connectivity: {
+    plan: () => Promise<ConnectivityCheckPlanEntry[]>;
+    test: () => Promise<ConnectivityCheckResult[]>;
+    onResult: (
+      callback: (result: ConnectivityCheckResult) => void,
+    ) => () => void;
+  };
+  mirror: {
+    setSource: (source: DownloadSource) => Promise<void>;
+    getState: () => Promise<MirrorState>;
+  };
+  shortcut: {
+    create: (
+      versionName: string,
+      instance?: number,
+      imageSource?: string,
+    ) => Promise<{ success: boolean; error?: string }>;
+  };
+  image: {
+    bytes: (source: string) => Promise<string | null>;
+  };
+  server: {
+    install: (
+      account: ILocalAccount | undefined,
+      downloadLimit: number,
+      versionPath: string,
+      serverPath: string,
+      conf: IServerConf,
+      versionConf?: IVersionConf,
+      options?: Pick<VersionInstallOptions, "keepProgressOpen" | "plan">,
+    ) => Promise<{ success: boolean; error?: string; cancelled?: boolean }>;
+    getSettings: (filePath: string) => Promise<IServerSettings | null>;
+    runOptions: (
+      serverPath: string,
+    ) => Promise<{ memory: number | null; aikarFlags: boolean | null }>;
+    stopAll: () => Promise<boolean>;
+    editXmx: (serverPath: string, memory: number) => Promise<boolean>;
+    isPortAvailable: (port: number) => Promise<boolean>;
+    setAikar: (serverPath: string, enabled: boolean) => Promise<boolean>;
+    updateProperties: (
+      filePath: string,
+      settings: IServerSettings,
+    ) => Promise<boolean>;
+    start: (serverPath: string) => Promise<ServerRunResult>;
+    stop: (serverPath: string, force?: boolean) => Promise<ServerRunResult>;
+    command: (serverPath: string, command: string) => Promise<ServerRunResult>;
+    lanAddress: () => Promise<string | null>;
+    runStatus: (serverPath: string) => Promise<ServerRunStatus>;
+    onRunState: (
+      callback: (payload: ServerRunStatePayload) => void,
+    ) => () => void;
+    onRunOutput: (
+      callback: (payload: { serverPath: string; lines: string[] }) => void,
+    ) => () => void;
+  };
+  skins: {
+    load: (
+      launcherPath: string,
+      platform: "microsoft" | "discord" | "elyby",
+      userId: string,
+      nickname: string,
+      accessToken: string,
+    ) => Promise<SkinsData | null>;
+    selectSkin: (
+      userId: string,
+      platform: string,
+      skinId: string | null,
+    ) => Promise<SkinsData | null>;
+    setCape: (
+      userId: string,
+      platform: string,
+      capeId: string | undefined,
+    ) => Promise<SkinsData | null>;
+    changeModel: (
+      userId: string,
+      platform: string,
+      model: "classic" | "slim",
+    ) => Promise<SkinsData | null>;
+    uploadSkin: (
+      userId: string,
+      platform: string,
+      skinPath: string,
+    ) => Promise<SkinsData | null>;
+    deleteSkin: (
+      userId: string,
+      platform: string,
+      skinId: string,
+      type: "skin" | "cape",
+    ) => Promise<SkinsData | null>;
+    resetSkin: (userId: string, platform: string) => Promise<SkinsData | null>;
+    regenerateSkin: (
+      userId: string,
+      platform: string,
+    ) => Promise<SkinsData | null>;
+    importByUrl: (
+      userId: string,
+      platform: string,
+      url: string,
+      type: "skin" | "cape",
+    ) => Promise<SkinsData | null>;
+    importByFile: (
+      userId: string,
+      platform: string,
+      filePath: string,
+      type: "skin" | "cape",
+    ) => Promise<SkinsData | null>;
+    importByNickname: (
+      userId: string,
+      platform: string,
+      nickname: string,
+    ) => Promise<SkinsData | null>;
+    renameSkin: (
+      userId: string,
+      platform: string,
+      skinId: string,
+      newName: string,
+    ) => Promise<SkinsData | null>;
+    clearManager: (userId: string, platform: string) => Promise<boolean>;
+    catalog: {
+      list: (params?: CatalogListParams) => Promise<CatalogListResult | null>;
+      download: (id: string) => Promise<{ downloads: number } | null>;
+      get: (id: string) => Promise<ICatalogSkin | null>;
+    };
+    publishCommunity: (
+      userId: string,
+      platform: string,
+      skinId: string,
+      backendToken: string,
+      name?: string,
+      type?: "skin" | "cape" | "pack",
+      tags?: string,
+    ) => Promise<PublishCommunityResult>;
+    tags: {
+      suggest: (q?: string, limit?: number) => Promise<string[]>;
+    };
+    importPack: (
+      userId: string,
+      platform: string,
+      skinUrl: string,
+      capeUrl: string,
+    ) => Promise<{ ok: boolean }>;
+    community: {
+      mine: (backendToken: string) => Promise<MyCommunityResult | null>;
+      delete: (backendToken: string, id: string) => Promise<{ ok: boolean }>;
+    };
+  };
+  modManager: {
+    search: (
+      query: string,
+      provider: Provider,
+      options: {
+        version: string | undefined;
+        loader: Loader | ServerCore | undefined;
+        projectType: ProjectType;
+        sort: string;
+        filter: string[];
+      },
+      pagination: {
+        offset: number;
+        limit: number;
+      },
+    ) => Promise<ISearchData>;
+    getSort: (provider: Provider) => Promise<string[]>;
+    getFilter: (
+      provider: Provider,
+      projectType: ProjectType,
+    ) => Promise<IFilterGroup[]>;
+    getProject: (
+      provider: Provider,
+      projectId: string,
+    ) => Promise<IProject | null>;
+    getVersions: (
+      provider: Provider,
+      projectId: string,
+      options: {
+        version?: string;
+        loader?: Loader;
+        projectType: ProjectType;
+        modUrl: string;
+      },
+    ) => Promise<IVersionModManager[]>;
+    getDependencies: (
+      provider: Provider,
+      projectId: string,
+      deps: IVersionDependency[],
+    ) => Promise<IVersionDependency[] | null>;
+    getChangelog: (
+      provider: Provider,
+      projectId: string,
+      versionId: string,
+    ) => Promise<string | null>;
+    ornitheGeneration: (
+      url: string,
+      sha1: string | undefined,
+      minecraftVersion: string,
+    ) => Promise<{ generation: number | null } | null>;
+    checkLocalMod: (modPath: string) => Promise<ILocalFileInfo | null>;
+    localDependencies: (
+      versionPath: string,
+    ) => Promise<import("@/types/ModManager").LocalModDependencyIndex>;
+    managedFiles: (
+      versionPath: string,
+    ) => Promise<Partial<Record<ProjectType, string[]>> | null>;
+    trashFiles: (
+      versionPath: string,
+      projectType: ProjectType,
+      names: string[],
+    ) => Promise<string[]>;
+    fileTimes: (
+      versionPath: string,
+      projectType: ProjectType,
+    ) => Promise<Record<string, number>>;
+    identifyLocal: (
+      requests: ILocalIdentifyRequest[],
+    ) => Promise<ILocalIdentifyResult>;
+    modrinthClientSides: (
+      ids: string[],
+    ) => Promise<Record<string, boolean> | null>;
+    checkModpack: (
+      modpackPath: string,
+      pack?: IProject,
+      selectVersion?: IVersionModManager,
+    ) => Promise<IModpackModManager | null>;
+    ptToFolder: (type: ProjectType) => Promise<string>;
+    resolveCfDownload: (
+      fileId: number,
+      fileName: string,
+    ) => Promise<string | null>;
+    compareMods: (
+      mods1: ILocalProject[],
+      mods2: ILocalProject[],
+    ) => Promise<boolean>;
+  };
+  modpack: {
+    writeBase: (
+      versionPath: string,
+      root: string,
+      input: ModpackBaseInput,
+    ) => Promise<boolean>;
+    readBase: (versionPath: string) => Promise<ModpackBase | null>;
+    planFiles: (
+      versionPath: string,
+      root: string,
+      extraFiles: IModpackExtraFile[],
+    ) => Promise<ModpackFilesPlan | null>;
+    applyFiles: (
+      versionPath: string,
+      root: string,
+      extraFiles: IModpackExtraFile[],
+      plan: ModpackFilesPlan,
+      previousConf: IVersionConf,
+      toVersion: string,
+      preserve?: string[],
+    ) => Promise<ModpackApplyResult | null>;
+    rollbackInfo: (versionPath: string) => Promise<ModpackRollbackInfo | null>;
+    restoreRollback: (versionPath: string) => Promise<ModpackRollback | null>;
+    dropRollback: (versionPath: string) => Promise<boolean>;
+  };
+  worlds: {
+    loadVersionStatistics: (
+      versionPath: string,
+      account: ILocalAccount,
+    ) => Promise<IWorldStatsAggregate | null>;
+    loadAchievementStats: (
+      account: ILocalAccount,
+    ) => Promise<IAchievementStatsResult | null>;
+    readWorld: (
+      worldPath: string,
+      account: ILocalAccount,
+    ) => Promise<IWorld | null>;
+    writeName: (worldPath: string, newName: string) => Promise<string | null>;
+    count: (versionPath: string) => Promise<number | null>;
+    folderSizes: (versionPath: string) => Promise<Record<string, number>>;
+    duplicate: (
+      worldPath: string,
+      newName: string,
+    ) => Promise<WorldDuplicateResult>;
+    export: (
+      worldPath: string,
+      destinationDir: string,
+    ) => Promise<WorldExportResult>;
+    import: (
+      zipPath: string,
+      versionPath: string,
+    ) => Promise<WorldImportResult>;
+    listBackups: (worldPath: string) => Promise<IWorldBackupList>;
+    countBackups: (versionPath: string) => Promise<Record<string, number>>;
+    createBackup: (
+      worldPath: string,
+      keep: number,
+    ) => Promise<WorldBackupCreateResult>;
+    restoreBackup: (
+      backupId: string,
+      worldPath: string,
+      keep: number,
+    ) => Promise<WorldBackupRestoreResult>;
+    deleteBackup: (backupId: string) => Promise<WorldBackupDeleteResult>;
+    deletePreserved: (targetPath: string) => Promise<WorldBackupDeleteResult>;
+  };
+  worldChunks: {
+    dimensions: (worldPath: string) => Promise<IChunkDimension[]>;
+    regions: (worldPath: string, dimension: string) => Promise<IChunkRegion[]>;
+    scanRegion: (
+      worldPath: string,
+      dimension: string,
+      regionX: number,
+      regionZ: number,
+    ) => Promise<IChunkRegionScan | null>;
+    inspect: (
+      worldPath: string,
+      dimension: string,
+      chunkX: number,
+      chunkZ: number,
+    ) => Promise<IChunkDetails | null>;
+    /** PNG bytes of the region's top-down render, or null when it cannot be drawn. */
+    renderSurface: (
+      worldPath: string,
+      dimension: string,
+      regionX: number,
+      regionZ: number,
+    ) => Promise<Uint8Array | null>;
+    delete: (
+      worldPath: string,
+      dimension: string,
+      coords: number[],
+      options: IChunkEditOptions,
+    ) => Promise<ChunkEditResult>;
+    resetInhabited: (
+      worldPath: string,
+      dimension: string,
+      coords: number[],
+      options: IChunkEditOptions,
+    ) => Promise<ChunkEditResult>;
+  };
+  statistics: {
+    getSyncQueue: () => Promise<IPlaytimeSyncEntry[]>;
+    resolveSyncEntries: (ids: string[]) => Promise<boolean>;
+  };
+  ai: {
+    prepareCrashReport: (
+      versionPath: string,
+      exitCode?: number,
+      nickname?: string,
+      versionName?: string,
+      instance?: number,
+    ) => Promise<IAiLogRequest | null>;
+    analyzeCrash: (
+      accessToken: string,
+      requestId: string,
+      locale: string,
+    ) => Promise<IAiAnalysisResult>;
+    sendFeedback: (
+      accessToken: string,
+      analysisId: string,
+      helpful: boolean,
+    ) => Promise<IAiFeedbackResult>;
+  };
+  agent: {
+    providers: {
+      list: () => Promise<AiProvidersState | null>;
+      save: (input: AiProviderInput) => Promise<AiProvidersState | null>;
+      remove: (id: string) => Promise<AiProvidersState | null>;
+      select: (id: string) => Promise<AiProvidersState | null>;
+      test: (payload: {
+        id?: string;
+        baseUrl?: string;
+        apiKey?: string;
+      }) => Promise<AiProviderTestResult>;
+    };
+    models: {
+      list: (providerId: string) => Promise<AiModelInfo[]>;
+    };
+    builtin: {
+      status: (accessToken: string) => Promise<AgentBuiltinStatus | null>;
+    };
+    chat: {
+      start: (runId: string, request: AgentStreamRequest) => Promise<boolean>;
+      abort: (runId: string) => Promise<boolean>;
+    };
+    chats: {
+      list: () => Promise<AgentChatSummary[]>;
+      read: (chatId: string) => Promise<AgentStoredChat | null>;
+      write: (chat: AgentStoredChat) => Promise<boolean>;
+      remove: (chatId: string) => Promise<boolean>;
+      tombstones: () => Promise<string[]>;
+      forgetTombstone: (remoteId: string) => Promise<boolean>;
+      sync: (
+        accessToken: string,
+        pending: AgentSyncPush[],
+      ) => Promise<AgentSyncResult>;
+      remoteMessages: (
+        accessToken: string,
+        chatId: string,
+      ) => Promise<RemoteAiChatMessage[]>;
+      remoteRemove: (accessToken: string, chatId: string) => Promise<boolean>;
+    };
+  };
+  rpc: {
+    syncContext: (context: RpcRendererContext) => Promise<void>;
+  };
+  skin: {
+    get: (
+      type: string,
+      uuid: string,
+      nickname: string,
+      accessToken?: string,
+    ) => Promise<ISkinData | null>;
+  };
+  share: {
+    startShare: (
+      visibility: ShareVisibility,
+    ) => Promise<ShareCommandResult<ShareState>>;
+    stopShare: () => Promise<ShareCommandResult<ShareState>>;
+    updateShareVisibility: (
+      visibility: ShareVisibility,
+    ) => Promise<ShareCommandResult<ShareState>>;
+    getShareState: () => Promise<ShareState>;
+    getSharePeers: () => Promise<SharePeerInfo[]>;
+    fetchActiveFriendShares: () => Promise<
+      ShareCommandResult<ActiveFriendShare[]>
+    >;
+    connectToFriendShare: (
+      slug: string,
+    ) => Promise<ShareCommandResult<ResolvedFriendShareConnection>>;
+    onShareStateChanged: (callback: (state: ShareState) => void) => () => void;
+    onShareError: (callback: (error: ShareStateError) => void) => () => void;
+    onSharePeersChanged: (
+      callback: (peers: SharePeerInfo[]) => void,
+    ) => () => void;
+  };
+  events: {
+    onConsoleChangeStatus: (
+      callback: (
+        versionName: string,
+        instance: number,
+        status: "running" | "stopped" | "error",
+      ) => void,
+    ) => () => void;
+    onConsoleMessage: (
+      callback: (versionName: string, instance: number, message: any) => void,
+    ) => () => void;
+    onConsoleClear: (
+      callback: (versionName: string, instance: number) => void,
+    ) => () => void;
+    onLaunch: (callback: () => void) => () => void;
+    onLaunchStalled: (
+      callback: (payload: LaunchStalledPayload) => void,
+    ) => () => void;
+    onUpdateFailed: (
+      callback: (payload: UpdateFailedPayload) => void,
+    ) => () => void;
+    onIpcError: (
+      callback: (payload: {
+        channel: string;
+        message: string;
+        notify?: boolean;
+        failure?: FailureInfo;
+      }) => void,
+    ) => () => void;
+    onCrashAnalysis: (
+      callback: (
+        versionName: string,
+        instance: number,
+        analysis: CrashAnalysisPayload,
+      ) => void,
+    ) => () => void;
+    onCrashUnresolved: (
+      callback: (payload: ICrashUnresolvedPayload) => void,
+    ) => () => void;
+    onFriendUpdate: (callback: (data: any) => void) => () => void;
+    onPlaytimeRecorded: (callback: () => void) => () => void;
+    onDownloaderInfo: (
+      callback: (info: DownloaderInfo | null) => void,
+    ) => () => void;
+    onDownloaderFailures: (
+      callback: (info: DownloaderFailuresInfo) => void,
+    ) => () => void;
+    onServerSyncNotice: (
+      callback: (notice: ServerSyncNotice) => void,
+    ) => () => void;
+    onModsQuarantined: (
+      callback: (notice: { versionName: string; entries: string[] }) => void,
+    ) => () => void;
+    onVersionInstallProgress: (
+      callback: (info: VersionInstallProgress | null) => void,
+    ) => () => void;
+    onWorldBackupProgress: (
+      callback: (progress: WorldBackupProgress) => void,
+    ) => () => void;
+    onArchiveExtractProgress: (
+      callback: (progress: ArchiveExtractProgress) => void,
+    ) => () => void;
+    onAgentStream: (
+      callback: (payload: AgentStreamEvent) => void,
+    ) => () => void;
+    onDeepLink: (callback: (payload: LauncherDeepLink) => void) => () => void;
+    updater: {
+      onStatus: (
+        callback: (payload: UpdaterStatusPayload) => void,
+      ) => () => void;
+      onDownloadProgress: (
+        callback: (progress: UpdaterProgress) => void,
+      ) => () => void;
+    };
+  };
+}
+
+type IpcFailureListener = (payload: IpcFailurePayload) => void;
+
+const ipcFailureListeners = new Set<IpcFailureListener>();
+
+function dispatchIpcFailure(payload: IpcFailurePayload): void {
+  for (const listener of [...ipcFailureListeners]) {
+    try {
+      listener(payload);
+    } catch (error) {
+      console.error("ipc:error listener failed", error);
+    }
+  }
+}
+
+ipcRenderer.on(
+  "ipc:error",
+  (_event: Electron.IpcRendererEvent, payload: IpcFailurePayload) =>
+    dispatchIpcFailure(payload),
+);
+
+const ipcFailureToken: string | undefined = (() => {
+  try {
+    const token = ipcRenderer.sendSync(IPC_FAILURE_TOKEN_CHANNEL);
+    return typeof token === "string" && token ? token : undefined;
+  } catch {
+    return undefined;
+  }
+})();
+
+function invoke<T = any>(channel: string, ...args: unknown[]): Promise<T> {
+  return ipcRenderer.invoke(channel, ...args).then((result) => {
+    const envelope = readIpcFailureEnvelope(result, ipcFailureToken);
+    if (!envelope) return result as T;
+
+    const { token: _token, ...payload } = envelope.__relaxingIpcFailure;
+    dispatchIpcFailure(payload);
+    return envelope.value as T;
+  });
+}
+
+const pathUtils = createPathUtils(process.platform === "win32");
+
+export const api: IElectronAPI = {
+  platform: process.platform,
+  os: {
+    totalmem: () => invoke("os:totalmem"),
+  },
+  java: {
+    list: (rescan?: boolean) => invoke("java:list", rescan),
+    add: () => invoke("java:add"),
+    remove: (home: string) => invoke("java:remove", home),
+    setDefault: (major: number, home: string | null) =>
+      invoke("java:setDefault", major, home),
+    prepare: (conf: IVersionConf) => invoke("java:prepare", conf),
+    ensure: (requiredMajor: number, override: JavaOverride | null) =>
+      invoke("java:ensure", requiredMajor, override),
+  },
+  storage: {
+    getBreakdown: () => invoke("storage:getBreakdown"),
+    clearCache: () => invoke("storage:clearCache"),
+    cleanup: (kind: StorageCleanupKind, names?: string[]) =>
+      invoke("storage:cleanup", kind, names),
+  },
+  dataLocation: {
+    get: () => invoke("dataLocation:get"),
+    pick: () => invoke("dataLocation:pick"),
+    planDefault: () => invoke("dataLocation:planDefault"),
+    apply: (kind: "move" | "adopt") => invoke("dataLocation:apply", kind),
+  },
+  dataLocationWindow: {
+    getState: () => invoke("dataLocationWindow:getState"),
+    action: (action: DataLocationWindowAction) =>
+      invoke("dataLocationWindow:action", action),
+    onState: (callback: (state: DataLocationWindowState) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        state: DataLocationWindowState,
+      ) => callback(state);
+      ipcRenderer.on("dataLocationWindow:state", listener);
+      return () => ipcRenderer.off("dataLocationWindow:state", listener);
+    },
+  },
+  path: {
+    join: (...args: string[]) => pathUtils.join(...args),
+    basename: (filePath: string, suffix?: string) =>
+      pathUtils.basename(filePath, suffix),
+    extname: (filePath: string) => pathUtils.extname(filePath),
+  },
+  fs: {
+    readFile: (filePath: string, encoding: BufferEncoding) =>
+      invoke("fs:readFile", filePath, encoding),
+    readFileBuffer: (target: string) => invoke("fs:readFileBuffer", target),
+    rimraf: (targetPath: string) => invoke("fs:rimraf", targetPath),
+    ensure: (dirPath: string) => invoke("fs:ensure", dirPath),
+    copy: (src: string, dest: string) => invoke("fs:copy", src, dest),
+    writeFile: (
+      filePath: string,
+      data: string | Uint8Array,
+      encoding: BufferEncoding = "utf-8",
+    ) => invoke("fs:writeFile", filePath, data, encoding),
+    pathExists: (targetPath: string) => invoke("fs:pathExists", targetPath),
+    readdirWithTypes: (folderPath: string) =>
+      invoke("fs:readdirWithTypes", folderPath),
+    sha1: (filePath: string) => invoke("fs:sha1", filePath),
+    readdir: (dirPath: string) => invoke("fs:readdir", dirPath),
+    extractZip: (zipPath: string, destination: string) =>
+      invoke("fs:extractZip", zipPath, destination),
+    rename: (oldPath: string, newPath: string) =>
+      invoke("fs:rename", oldPath, newPath),
+    writeJSON: (filePath: string, data: any) =>
+      invoke("fs:writeJSON", filePath, data),
+    writeJSONSync: (filePath: string, data: any): string => {
+      try {
+        return String(ipcRenderer.sendSync("fs:writeJSONSync", filePath, data));
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    },
+    readJSON: <_>(filePath: string, encoding?: BufferEncoding) =>
+      invoke("fs:readJSON", filePath, encoding),
+    getDirectories: (source: string) => invoke("fs:getDirectories", source),
+  },
+  clipboard: {
+    writeText: (text: string) => invoke("clipboard:writeText", text),
+    writeImage: (path: string) => invoke("clipboard:writeImage", path),
+    writeImageData: (bytes: Uint8Array) =>
+      invoke("clipboard:writeImageData", bytes),
+  },
+  media: {
+    fetchImage: (url: string) => invoke("media:fetchImage", url),
+    saveImage: (url: string, name: string) =>
+      invoke("media:saveImage", url, name),
+    showSaved: () => invoke("media:showSaved"),
+  },
+  edit: {
+    run: (command: "cut" | "copy" | "paste" | "selectAll") =>
+      invoke("edit:run", command),
+  },
+  shell: {
+    openExternal: (url: string) => invoke("shell:openExternal", url),
+    openPath: (path: string) => invoke("shell:openPath", path),
+    trashItem: (path: string) => invoke("shell:trashItem", path),
+    showItemInFolder: (path: string) => invoke("shell:showItemInFolder", path),
+  },
+  file: {
+    archiveFiles: (
+      filesToArchive: string[],
+      zipPath: string,
+      basePath?: string,
+    ) => invoke("file:archiveFiles", filesToArchive, zipPath, basePath),
+    archiveForPublish: (
+      filesToArchive: string[],
+      zipPath: string,
+      basePath?: string,
+    ) => invoke("file:archiveForPublish", filesToArchive, zipPath, basePath),
+    getTotalSizes: (filePaths: string[]) =>
+      invoke("file:getTotalSizes", filePaths),
+    fromBuffer: (data: ArrayBuffer) => Buffer.from(data).toString("binary"),
+    download: (items: DownloadItem[], limit: number) =>
+      invoke("file:download", items, limit),
+  },
+  servers: {
+    write: (servers: IServer[], filePath: string) =>
+      invoke("servers:write", servers, filePath),
+    versions: (versions: IVersionConf[]) =>
+      invoke("servers:versions", versions),
+    get: (version: string, loader: Loader) =>
+      invoke("servers:get", version, loader),
+    read: (path: string) => invoke("servers:read", path),
+    ping: (address: string) => invoke("servers:ping", address),
+    discover: (query: ModrinthServerQuery) =>
+      invoke("servers:discover", query),
+    discoverPack: (projectId: string, versionId: string) =>
+      invoke("servers:discoverPack", projectId, versionId),
+    discoverGallery: (projectId: string) =>
+      invoke("servers:discoverGallery", projectId),
+    compare: (servers1: IServer[], servers2: IServer[]) =>
+      invoke("servers:compare", servers1, servers2),
+  },
+  version: {
+    import: (filePath: string, tempPath: string) =>
+      invoke("version:import", filePath, tempPath),
+    duplicate: (sourceName: string, targetName: string) =>
+      invoke("version:duplicate", sourceName, targetName),
+    init: (versionConf: IVersionConf) => invoke("version:init", versionConf),
+    install: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      extraItems?: DownloadItem[],
+      options?: VersionInstallOptions,
+    ) =>
+      invoke(
+        "version:install",
+        account,
+        settings,
+        versionConf,
+        extraItems,
+        options,
+      ),
+    changeLoader: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      targetId: string,
+    ) =>
+      invoke("version:changeLoader", account, settings, versionConf, targetId),
+    loaderRequirements: (versionPath: string, loader: Loader) =>
+      invoke("version:loaderRequirements", versionPath, loader),
+    importJarMods: (versionPath: string, filePaths: string[]) =>
+      invoke("version:importJarMods", versionPath, filePaths),
+    removeJarMod: (versionPath: string, file: string) =>
+      invoke("version:removeJarMod", versionPath, file),
+    jarModFiles: (versionPath: string) =>
+      invoke("version:jarModFiles", versionPath),
+    syncJarMods: (versionPath: string, jar: IJarModSet) =>
+      invoke("version:syncJarMods", versionPath, jar),
+    checkOrnitheMods: (versionPath: string, minecraftVersion: string) =>
+      invoke("version:checkOrnitheMods", versionPath, minecraftVersion),
+    cancelInstall: () => invoke("version:cancelInstall"),
+    pauseInstall: () => invoke("version:pauseInstall"),
+    resumeInstall: () => invoke("version:resumeInstall"),
+    getPauseState: () => invoke("version:getPauseState"),
+    ensureAuthlib: (account: ILocalAccount, versionConf: IVersionConf) =>
+      invoke("version:ensureAuthlib", account, versionConf),
+    getRunCommand: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      authData: IAuth | null,
+      isRelative: boolean,
+      quick?: { single?: string; multiplayer?: string },
+    ) =>
+      invoke(
+        "version:getRunCommand",
+        account,
+        settings,
+        versionConf,
+        authData,
+        isRelative,
+        quick,
+      ),
+    run: (
+      account: ILocalAccount,
+      settings: TSettings,
+      versionConf: IVersionConf,
+      authData: IAuth | null,
+      instance: number,
+      quick: { single?: string; multiplayer?: string },
+    ) =>
+      invoke(
+        "version:run",
+        account,
+        settings,
+        versionConf,
+        authData,
+        instance,
+        quick,
+      ),
+    delete: (
+      account: ILocalAccount,
+      versionConf: IVersionConf,
+      isFull: boolean,
+    ) => invoke("version:delete", account, versionConf, isFull),
+    save: (versionConf: IVersionConf) => invoke("version:save", versionConf),
+    share: {
+      uploadMods: (at: string, versionConf: IVersionConf) =>
+        invoke("share:uploadMods", at, versionConf),
+      uploadJarMods: (
+        at: string,
+        versionPath: string,
+        shareCode: string,
+        jar: IJarModSet,
+      ) => invoke("share:uploadJarMods", at, versionPath, shareCode, jar),
+    },
+  },
+  accounts: {
+    load: () => invoke("accounts:load"),
+    save: (accounts: IAccountConf["accounts"], lastPlayed: string | null) =>
+      invoke("accounts:save", accounts, lastPlayed),
+  },
+  auth: {
+    microsoft: (code: string, codeVerifier?: string) =>
+      invoke("auth:microsoft", code, codeVerifier),
+    microsoftRefresh: (refreshToken: string, id: string) =>
+      invoke("auth:microsoft:refresh", refreshToken, id),
+    elyby: (code: string) => invoke("auth:elyby", code),
+    elybyRefresh: (refreshToken: string, id: string) =>
+      invoke("auth:elyby:refresh", refreshToken, id),
+    discord: (code: string) => invoke("auth:discord", code),
+    discordRefresh: (refreshToken: string, id: string) =>
+      invoke("auth:discord:refresh", refreshToken, id),
+    startServer: (expectedState: string) =>
+      invoke("auth:startServer", expectedState),
+    stopServer: () => invoke("auth:stopServer"),
+  },
+  backend: {
+    getModpack: (at: string, code: string) =>
+      invoke("backend:getModpack", at, code),
+    getOwnModpacks: (at: string) => invoke("backend:getOwnModpacks", at),
+    exploreModpacks: (query: IExploreQuery) =>
+      invoke("backend:exploreModpacks", query),
+    getPublicProfile: (nickname: string, userId?: string) =>
+      invoke("backend:getPublicProfile", nickname, userId),
+    shareModpack: (
+      at: string,
+      modpack: { conf: IModpack["conf"]; isPublic?: boolean },
+    ) => invoke("backend:shareModpack", at, modpack),
+    updateModpack: (at: string, shareCode: string, update: IModpackUpdate) =>
+      invoke("backend:updateModpack", at, shareCode, update),
+    deleteModpack: (at: string, shareCode: string) =>
+      invoke("backend:deleteModpack", at, shareCode),
+    updateUser: (at: string, id: string, user: IUpdateUser) =>
+      invoke("backend:updateUser", at, id, user),
+    getUser: (at: string, id: string) => invoke("backend:getUser", at, id),
+    getMutualFriends: (at: string, id: string) =>
+      invoke("backend:getMutualFriends", at, id),
+    getRemoteStats: (at: string) => invoke("backend:getRemoteStats", at),
+    groupsList: (at: string) => invoke("backend:groupsList", at),
+    groupCreate: (at: string, name: string) =>
+      invoke("backend:groupCreate", at, name),
+    groupRename: (at: string, groupId: string, name: string) =>
+      invoke("backend:groupRename", at, groupId, name),
+    groupDelete: (at: string, groupId: string) =>
+      invoke("backend:groupDelete", at, groupId),
+    groupJoinVoice: (at: string, groupId: string) =>
+      invoke("backend:groupJoinVoice", at, groupId),
+    groupJoinByCode: (at: string, code: string) =>
+      invoke("backend:groupJoinByCode", at, code),
+    groupLeave: (at: string, groupId: string) =>
+      invoke("backend:groupLeave", at, groupId),
+    groupKickMember: (at: string, groupId: string, memberId: string) =>
+      invoke("backend:groupKickMember", at, groupId, memberId),
+    groupBanMember: (at: string, groupId: string, memberId: string) =>
+      invoke("backend:groupBanMember", at, groupId, memberId),
+    groupUnbanMember: (at: string, groupId: string, memberId: string) =>
+      invoke("backend:groupUnbanMember", at, groupId, memberId),
+    groupTransferOwner: (at: string, groupId: string, memberId: string) =>
+      invoke("backend:groupTransferOwner", at, groupId, memberId),
+    groupResetCode: (at: string, groupId: string) =>
+      invoke("backend:groupResetCode", at, groupId),
+    resetFriendCode: (at: string, id: string) =>
+      invoke("backend:resetFriendCode", at, id),
+    getNicknameStatus: (at: string, id: string) =>
+      invoke("backend:getNicknameStatus", at, id),
+    checkNickname: (at: string, id: string, name: string) =>
+      invoke("backend:checkNickname", at, id, name),
+    changeNickname: (at: string, id: string, nickname: string) =>
+      invoke("backend:changeNickname", at, id, nickname),
+    resetNickname: (at: string, id: string) =>
+      invoke("backend:resetNickname", at, id),
+    updateFriendSettings: (
+      at: string,
+      id: string,
+      settings: IFriendSettingsUpdate,
+    ) => invoke("backend:updateFriendSettings", at, id, settings),
+    uploadFileFromPath: (
+      at: string,
+      filePath: string,
+      fileName?: string,
+      folder?: string,
+      progressId?: string,
+      direct?: boolean,
+    ) =>
+      invoke(
+        "backend:uploadFileFromPath",
+        at,
+        filePath,
+        fileName,
+        folder,
+        progressId,
+        direct,
+      ),
+    onUploadFileProgress: (
+      callback: (progress: UploadFileProgress) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        progress: UploadFileProgress,
+      ) => {
+        callback(progress);
+      };
+      ipcRenderer.on("backend:uploadFileProgress", listener);
+      return () => ipcRenderer.off("backend:uploadFileProgress", listener);
+    },
+    deleteFile: (at: string, key: string, isDirectory?: boolean) =>
+      invoke("backend:deleteFile", at, key, isDirectory),
+    modpackDownloaded: (at: string, shareCode: string) =>
+      invoke("backend:modpackDownloaded", at, shareCode),
+    getNews: () => invoke("backend:getNews"),
+    getNewsPage: (params: {
+      limit?: number;
+      cursor?: string;
+      source?: string;
+    }) => invoke("backend:getNewsPage", params),
+    checkUpdates: (request: IUpdateCheckRequest) =>
+      invoke("backend:checkUpdates", request),
+    getGlobalLeaderboard: (limit: number) =>
+      invoke("backend:getGlobalLeaderboard", limit),
+    getOwnLeaderboardRank: (at: string) =>
+      invoke("backend:getOwnLeaderboardRank", at),
+    getAchievementReach: () => invoke("backend:getAchievementReach"),
+    getWhatsNew: (version: string, locale: string) =>
+      invoke("backend:getWhatsNew", version, locale),
+    getLauncherReleases: (locale: string, limit: number) =>
+      invoke("backend:getLauncherReleases", locale, limit),
+    getSponsoredNewsAd: (locale: string, hiddenIds: string[]) =>
+      invoke("backend:getSponsoredNewsAd", locale, hiddenIds),
+    recordSponsoredAdImpression: (id: string) =>
+      invoke("backend:recordSponsoredAdImpression", id),
+    recordSponsoredAdClick: (id: string) =>
+      invoke("backend:recordSponsoredAdClick", id),
+    approveSiteLogin: (at: string, requestId: string) =>
+      invoke("backend:approveSiteLogin", at, requestId),
+    declineSiteLogin: (at: string, requestId: string) =>
+      invoke("backend:declineSiteLogin", at, requestId),
+    discordLink: (at: string, code: string) =>
+      invoke("backend:discordLink", at, code),
+    discordUnlink: (at: string) => invoke("backend:discordUnlink", at),
+    telegramLinkStart: (at: string) => invoke("backend:telegramLinkStart", at),
+    telegramUnlink: (at: string) => invoke("backend:telegramUnlink", at),
+    updateNotifications: (
+      at: string,
+      id: string,
+      prefs: Partial<INotificationPrefs>,
+    ) => invoke("backend:updateNotifications", at, id, prefs),
+    apiBaseUrl: () => invoke("backend:apiBaseUrl"),
+    onApiBaseUrl: (callback: (baseUrl: string) => void) => {
+      const listener = (_: unknown, baseUrl: string) => callback(baseUrl);
+      ipcRenderer.on("api:baseUrl", listener);
+      return () => ipcRenderer.off("api:baseUrl", listener);
+    },
+    aiComplete: (at: string, prompt: string) =>
+      invoke("backend:aiComplete", at, prompt),
+    checkHealth: () => invoke("backend:checkHealth"),
+  },
+  voice: {
+    setPtt: (bind: { type: "key" | "mouse"; code: number } | null) =>
+      invoke("voice:setPtt", bind),
+    capturePttBind: () => invoke("voice:capturePttBind"),
+    setSessionActive: (active: boolean) =>
+      invoke("voice:setSessionActive", active),
+    onPttDown: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on("voice:pttDown", listener);
+      return () => ipcRenderer.off("voice:pttDown", listener);
+    },
+    onPttUp: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on("voice:pttUp", listener);
+      return () => ipcRenderer.off("voice:pttUp", listener);
+    },
+    updateOverlay: (state: VoiceOverlayState) =>
+      invoke("voice:overlayUpdate", state),
+    onOverlayState: (callback: (state: VoiceOverlayState) => void) => {
+      const listener = (
+        _: Electron.IpcRendererEvent,
+        state: VoiceOverlayState,
+      ) => callback(state);
+      ipcRenderer.on("voiceOverlay:state", listener);
+      return () => ipcRenderer.off("voiceOverlay:state", listener);
+    },
+  },
+  versions: {
+    getList: (loader: Loader, includeSnapshots: boolean = false) =>
+      invoke("versions:getList", loader, includeSnapshots),
+    getLoaderVersions: (
+      loader: Exclude<Loader, "vanilla">,
+      versionId: string,
+    ) => invoke("versions:getLoaderVersions", loader, versionId),
+  },
+  game: {
+    closeGame: (versionName: string, instance: number) =>
+      invoke("game:closeGame", versionName, instance),
+  },
+  journal: {
+    write: (entries: JournalUiEntry[]) => {
+      ipcRenderer.send("journal:write", entries);
+    },
+    status: () => invoke("journal:status"),
+    setVerbose: (minutes: number | null) =>
+      invoke("journal:setVerbose", minutes),
+    openFolder: () => invoke("journal:openFolder"),
+  },
+  support: {
+    prepare: (request: SupportReportRequest) =>
+      invoke("support:prepare", request),
+    send: (id: string, accessToken?: string | null) =>
+      invoke("support:send", id, accessToken ?? null),
+    save: (id: string) => invoke("support:save", id),
+    history: () => invoke("support:history"),
+  },
+  logs: {
+    list: (versionPath: string) => invoke("logs:list", versionPath),
+    read: (versionPath: string, name: string, kind: GameLogKind) =>
+      invoke("logs:read", versionPath, name, kind),
+    analyze: (
+      versionPath: string,
+      name: string,
+      kind: GameLogKind,
+      exitCode?: number,
+    ) => invoke("logs:analyze", versionPath, name, kind, exitCode),
+  },
+  mods: {
+    check: (
+      settings: TSettings,
+      versionConf: IVersionConf,
+      server?: IServerConf,
+      options?: VersionInstallOptions,
+    ) => invoke("mods:check", settings, versionConf, server, options),
+    downloadOther: (
+      settings: TSettings,
+      versionConf: IVersionConf,
+      options?: VersionInstallOptions,
+    ) => invoke("mods:downloadOther", settings, versionConf, options),
+    syncLive: (
+      settings: TSettings,
+      versionConf: IVersionConf,
+      options?: VersionInstallOptions,
+    ) => invoke("mods:syncLive", settings, versionConf, options),
+    cancelInstall: () => invoke("mods:cancelInstall"),
+  },
+  other: {
+    getVersion: () => invoke("other:getVersion"),
+    openFileDialog: (
+      isFolder?: boolean,
+      filters?: { name: string; extensions: string[] }[],
+      multi?: boolean,
+    ) => invoke("other:openFileDialog", isFolder, filters, multi),
+    getPathForFile: (file: File) => {
+      const filePath = webUtils.getPathForFile(file);
+      if (filePath) ipcRenderer.sendSync("safepath:bless", filePath);
+      return filePath;
+    },
+    gameTextures: (names: string[]) => invoke("other:gameTextures", names),
+    getPaths: () => invoke("other:getPaths"),
+    getPath: (pathKey: string) => invoke("other:getPath", pathKey),
+    notify: (
+      options: Electron.NotificationConstructorOptions,
+      clickAction?: NotificationClickAction,
+    ) => invoke("other:notify", options, clickAction),
+    getLocale: () => invoke("other:getLocale"),
+    restoreWindow: () => invoke("other:restoreWindow"),
+    setUnsavedGuard: (value: boolean) => invoke("other:setUnsavedGuard", value),
+    confirmClose: () => invoke("other:confirmClose"),
+    onCloseRequested: (
+      callback: (reason: {
+        unsaved: boolean;
+        servers: boolean;
+        install: boolean;
+      }) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        reason?: { unsaved: boolean; servers: boolean; install?: boolean },
+      ) =>
+        callback({
+          unsaved: reason?.unsaved ?? true,
+          servers: reason?.servers ?? false,
+          install: reason?.install ?? false,
+        });
+      ipcRenderer.on("app:closeRequested", listener);
+      return () => ipcRenderer.off("app:closeRequested", listener);
+    },
+    onNotificationClick: (
+      callback: (action: NotificationClickAction) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        action: NotificationClickAction,
+      ) => callback(action);
+      ipcRenderer.on("other:notificationClick", listener);
+      return () => ipcRenderer.off("other:notificationClick", listener);
+    },
+  },
+  allowedPaths: {
+    list: () => invoke("safepath:list"),
+    revoke: (target: string) => invoke("safepath:revoke", target),
+  },
+  tray: {
+    update: (model: TrayModel) => invoke("tray:update", model),
+    onAction: (callback: (action: TrayAction) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        action: TrayAction,
+      ) => callback(action);
+      ipcRenderer.on("tray:action", listener);
+      return () => ipcRenderer.off("tray:action", listener);
+    },
+  },
+  trayPopup: {
+    getModel: () => invoke("trayPopup:getModel"),
+    run: (command: TrayCommand) => invoke("trayPopup:run", command),
+    resize: (height: number) => invoke("trayPopup:resize", height),
+    hide: () => invoke("trayPopup:hide"),
+    reveal: () => invoke("trayPopup:reveal"),
+    onModel: (callback: (model: TrayModel) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, model: TrayModel) =>
+        callback(model);
+      ipcRenderer.on("trayPopup:model", listener);
+      return () => ipcRenderer.off("trayPopup:model", listener);
+    },
+    onShown: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on("trayPopup:shown", listener);
+      return () => ipcRenderer.off("trayPopup:shown", listener);
+    },
+  },
+  appUpdate: {
+    getState: () => invoke("appUpdate:getState"),
+    install: () => invoke("appUpdate:install"),
+    onState: (callback: (state: AppUpdateState) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        state: AppUpdateState,
+      ) => callback(state);
+      ipcRenderer.on("app:updateState", listener);
+      return () => ipcRenderer.off("app:updateState", listener);
+    },
+  },
+  streamer: {
+    watch: (enabled: boolean) => invoke("streamer:watch", enabled),
+    onDetected: (callback: (app: string | null) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        app: string | null,
+      ) => callback(app);
+      ipcRenderer.on("streamer:detected", listener);
+      return () => ipcRenderer.off("streamer:detected", listener);
+    },
+  },
+  system: {
+    getLaunchAtLogin: () => invoke("system:getLaunchAtLogin"),
+    setLaunchAtLogin: (enabled: boolean) =>
+      invoke("system:setLaunchAtLogin", enabled),
+  },
+  connectivity: {
+    plan: () => invoke("connectivity:plan"),
+    test: () => invoke("connectivity:test"),
+    onResult: (callback: (result: ConnectivityCheckResult) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        result: ConnectivityCheckResult,
+      ) => callback(result);
+      ipcRenderer.on("connectivity:result", listener);
+      return () => ipcRenderer.off("connectivity:result", listener);
+    },
+  },
+  mirror: {
+    setSource: (source: DownloadSource) => invoke("mirror:setSource", source),
+    getState: () => invoke("mirror:getState"),
+  },
+  shortcut: {
+    create: (versionName: string, instance?: number, imageSource?: string) =>
+      invoke("shortcut:create", versionName, instance, imageSource),
+  },
+  image: {
+    bytes: (source: string) => invoke("image:bytes", source),
+  },
+  server: {
+    install: (
+      account: ILocalAccount | undefined,
+      downloadLimit: number,
+      versionPath: string,
+      serverPath: string,
+      conf: IServerConf,
+      versionConf?: IVersionConf,
+      options?: Pick<VersionInstallOptions, "keepProgressOpen" | "plan">,
+    ) =>
+      invoke(
+        "server:install",
+        account,
+        downloadLimit,
+        versionPath,
+        serverPath,
+        conf,
+        versionConf,
+        options,
+      ),
+    getSettings: (filePath: string) => invoke("server:getSettings", filePath),
+    runOptions: (serverPath: string) => invoke("server:runOptions", serverPath),
+    stopAll: () => invoke("server:stopAll"),
+    editXmx: (serverPath: string, memory: number) =>
+      invoke("server:editXmx", serverPath, memory),
+    isPortAvailable: (port: number) => invoke("server:isPortAvailable", port),
+    setAikar: (serverPath: string, enabled: boolean) =>
+      invoke("server:setAikar", serverPath, enabled),
+    updateProperties: (filePath: string, settings: IServerSettings) =>
+      invoke("server:updateProperties", filePath, settings),
+    start: (serverPath: string) => invoke("server:start", serverPath),
+    stop: (serverPath: string, force?: boolean) =>
+      invoke("server:stop", serverPath, force),
+    command: (serverPath: string, command: string) =>
+      invoke("server:command", serverPath, command),
+    lanAddress: () => invoke("server:lanAddress"),
+    runStatus: (serverPath: string) => invoke("server:runStatus", serverPath),
+    onRunState: (callback: (payload: ServerRunStatePayload) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: ServerRunStatePayload,
+      ) => callback(payload);
+      ipcRenderer.on("server:state", listener);
+      return () => ipcRenderer.off("server:state", listener);
+    },
+    onRunOutput: (
+      callback: (payload: { serverPath: string; lines: string[] }) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: { serverPath: string; lines: string[] },
+      ) => callback(payload);
+      ipcRenderer.on("server:output", listener);
+      return () => ipcRenderer.off("server:output", listener);
+    },
+  },
+  skins: {
+    load: (
+      launcherPath: string,
+      platform: "microsoft" | "discord" | "elyby",
+      userId: string,
+      nickname: string,
+      accessToken: string,
+    ) =>
+      invoke(
+        "skins:load",
+        launcherPath,
+        platform,
+        userId,
+        nickname,
+        accessToken,
+      ),
+    selectSkin: (userId: string, platform: string, skinId: string | null) =>
+      invoke("skins:selectSkin", userId, platform, skinId),
+    setCape: (userId: string, platform: string, capeId: string | undefined) =>
+      invoke("skins:setCape", userId, platform, capeId),
+    changeModel: (
+      userId: string,
+      platform: string,
+      model: "classic" | "slim",
+    ) => invoke("skins:changeModel", userId, platform, model),
+    uploadSkin: (userId: string, platform: string, skinPath: string) =>
+      invoke("skins:uploadSkin", userId, platform, skinPath),
+    deleteSkin: (
+      userId: string,
+      platform: string,
+      skinId: string,
+      type: "skin" | "cape",
+    ) => invoke("skins:deleteSkin", userId, platform, skinId, type),
+    resetSkin: (userId: string, platform: string) =>
+      invoke("skins:resetSkin", userId, platform),
+    regenerateSkin: (userId: string, platform: string) =>
+      invoke("skins:regenerateSkin", userId, platform),
+    importByUrl: (
+      userId: string,
+      platform: string,
+      url: string,
+      type: "skin" | "cape",
+    ) => invoke("skins:importByUrl", userId, platform, url, type),
+    importByFile: (
+      userId: string,
+      platform: string,
+      filePath: string,
+      type: "skin" | "cape",
+    ) => invoke("skins:importByFile", userId, platform, filePath, type),
+    importByNickname: (userId: string, platform: string, nickname: string) =>
+      invoke("skins:importByNickname", userId, platform, nickname),
+    renameSkin: (
+      userId: string,
+      platform: string,
+      skinId: string,
+      newName: string,
+    ) => invoke("skins:renameSkin", userId, platform, skinId, newName),
+    clearManager: (userId: string, platform: string) =>
+      invoke("skins:clearManager", userId, platform),
+    catalog: {
+      list: (params?: CatalogListParams) => invoke("skins:catalogList", params),
+      download: (id: string) => invoke("skins:catalogDownload", id),
+      get: (id: string) => invoke("skins:catalogItem", id),
+    },
+    publishCommunity: (
+      userId: string,
+      platform: string,
+      skinId: string,
+      backendToken: string,
+      name?: string,
+      type?: "skin" | "cape" | "pack",
+      tags?: string,
+    ) =>
+      invoke(
+        "skins:publishCommunity",
+        userId,
+        platform,
+        skinId,
+        backendToken,
+        name,
+        type,
+        tags,
+      ),
+    tags: {
+      suggest: (q?: string, limit?: number) =>
+        invoke("skins:tagsSuggest", q, limit),
+    },
+    importPack: (
+      userId: string,
+      platform: string,
+      skinUrl: string,
+      capeUrl: string,
+    ) => invoke("skins:importPack", userId, platform, skinUrl, capeUrl),
+    community: {
+      mine: (backendToken: string) =>
+        invoke("skins:communityMine", backendToken),
+      delete: (backendToken: string, id: string) =>
+        invoke("skins:communityDelete", backendToken, id),
+    },
+  },
+  modManager: {
+    search: (
+      query: string,
+      provider: Provider,
+      options: any,
+      pagination: any,
+    ) => invoke("modManager:search", query, provider, options, pagination),
+    getSort: (provider: any) => invoke("modManager:getSort", provider),
+    getFilter: (provider: Provider, projectType: ProjectType) =>
+      invoke("modManager:getFilter", provider, projectType),
+    getProject: (provider: Provider, projectId: string) =>
+      invoke("modManager:getProject", provider, projectId),
+    getVersions: (provider: Provider, projectId: string, options: any) =>
+      invoke("modManager:getVersions", provider, projectId, options),
+    getDependencies: (provider: Provider, projectId: string, deps: any[]) =>
+      invoke("modManager:getDependencies", provider, projectId, deps),
+    getChangelog: (provider: Provider, projectId: string, versionId: string) =>
+      invoke("modManager:getChangelog", provider, projectId, versionId),
+    ornitheGeneration: (
+      url: string,
+      sha1: string | undefined,
+      minecraftVersion: string,
+    ) =>
+      invoke("modManager:ornitheGeneration", url, sha1, minecraftVersion),
+    checkLocalMod: (modPath: string) =>
+      invoke("modManager:checkLocalMod", modPath),
+    localDependencies: (versionPath: string) =>
+      invoke("modManager:localDependencies", versionPath),
+    managedFiles: (versionPath: string) =>
+      invoke("modManager:managedFiles", versionPath),
+    trashFiles: (
+      versionPath: string,
+      projectType: ProjectType,
+      names: string[],
+    ) => invoke("modManager:trashFiles", versionPath, projectType, names),
+    fileTimes: (versionPath: string, projectType: ProjectType) =>
+      invoke("modManager:fileTimes", versionPath, projectType),
+    identifyLocal: (requests: ILocalIdentifyRequest[]) =>
+      invoke("modManager:identifyLocal", requests),
+    modrinthClientSides: (ids: string[]) =>
+      invoke("modManager:modrinthClientSides", ids),
+    checkModpack: (
+      modpackPath: string,
+      pack?: any,
+      selectVersion?: IVersionModManager,
+    ) => invoke("modManager:checkModpack", modpackPath, pack, selectVersion),
+    ptToFolder: (type: ProjectType) => invoke("modManager:ptToFolder", type),
+    resolveCfDownload: (fileId: number, fileName: string) =>
+      invoke("modManager:resolveCfDownload", fileId, fileName),
+    compareMods: (mods1: ILocalProject[], mods2: ILocalProject[]) =>
+      invoke("modManager:compareMods", mods1, mods2),
+  },
+  modpack: {
+    writeBase: (versionPath: string, root: string, input: ModpackBaseInput) =>
+      invoke("modpack:writeBase", versionPath, root, input),
+    readBase: (versionPath: string) => invoke("modpack:readBase", versionPath),
+    planFiles: (
+      versionPath: string,
+      root: string,
+      extraFiles: IModpackExtraFile[],
+    ) => invoke("modpack:planFiles", versionPath, root, extraFiles),
+    applyFiles: (
+      versionPath: string,
+      root: string,
+      extraFiles: IModpackExtraFile[],
+      plan: ModpackFilesPlan,
+      previousConf: IVersionConf,
+      toVersion: string,
+      preserve?: string[],
+    ) =>
+      invoke(
+        "modpack:applyFiles",
+        versionPath,
+        root,
+        extraFiles,
+        plan,
+        previousConf,
+        toVersion,
+        preserve,
+      ),
+    rollbackInfo: (versionPath: string) =>
+      invoke("modpack:rollbackInfo", versionPath),
+    restoreRollback: (versionPath: string) =>
+      invoke("modpack:restoreRollback", versionPath),
+    dropRollback: (versionPath: string) =>
+      invoke("modpack:dropRollback", versionPath),
+  },
+  worlds: {
+    loadVersionStatistics: (versionPath: string, account: ILocalAccount) =>
+      invoke("worlds:loadVersionStatistics", versionPath, account),
+    loadAchievementStats: (account: ILocalAccount) =>
+      invoke("worlds:loadAchievementStats", account),
+    readWorld: (worldPath: string, account: ILocalAccount) =>
+      invoke("worlds:readWorld", worldPath, account),
+    writeName: (worldPath: string, newName: string) =>
+      invoke("worlds:writeName", worldPath, newName),
+    count: (versionPath: string) => invoke("worlds:count", versionPath),
+    folderSizes: (versionPath: string) =>
+      invoke("worlds:folderSizes", versionPath),
+    duplicate: (worldPath: string, newName: string) =>
+      invoke("worlds:duplicate", worldPath, newName),
+    export: (worldPath: string, destinationDir: string) =>
+      invoke("worlds:export", worldPath, destinationDir),
+    import: (zipPath: string, versionPath: string) =>
+      invoke("worlds:import", zipPath, versionPath),
+    listBackups: (worldPath: string) => invoke("worlds:listBackups", worldPath),
+    countBackups: (versionPath: string) =>
+      invoke("worlds:countBackups", versionPath),
+    createBackup: (worldPath: string, keep: number) =>
+      invoke("worlds:createBackup", worldPath, keep),
+    restoreBackup: (backupId: string, worldPath: string, keep: number) =>
+      invoke("worlds:restoreBackup", backupId, worldPath, keep),
+    deleteBackup: (backupId: string) => invoke("worlds:deleteBackup", backupId),
+    deletePreserved: (targetPath: string) =>
+      invoke("worlds:deletePreserved", targetPath),
+  },
+  worldChunks: {
+    dimensions: (worldPath: string) =>
+      invoke("worldChunks:dimensions", worldPath),
+    regions: (worldPath: string, dimension: string) =>
+      invoke("worldChunks:regions", worldPath, dimension),
+    scanRegion: (
+      worldPath: string,
+      dimension: string,
+      regionX: number,
+      regionZ: number,
+    ) =>
+      invoke("worldChunks:scanRegion", worldPath, dimension, regionX, regionZ),
+    inspect: (
+      worldPath: string,
+      dimension: string,
+      chunkX: number,
+      chunkZ: number,
+    ) => invoke("worldChunks:inspect", worldPath, dimension, chunkX, chunkZ),
+    renderSurface: (
+      worldPath: string,
+      dimension: string,
+      regionX: number,
+      regionZ: number,
+    ) =>
+      invoke(
+        "worldChunks:renderSurface",
+        worldPath,
+        dimension,
+        regionX,
+        regionZ,
+      ),
+    delete: (
+      worldPath: string,
+      dimension: string,
+      coords: number[],
+      options: IChunkEditOptions,
+    ) => invoke("worldChunks:delete", worldPath, dimension, coords, options),
+    resetInhabited: (
+      worldPath: string,
+      dimension: string,
+      coords: number[],
+      options: IChunkEditOptions,
+    ) =>
+      invoke(
+        "worldChunks:resetInhabited",
+        worldPath,
+        dimension,
+        coords,
+        options,
+      ),
+  },
+  statistics: {
+    getSyncQueue: () => invoke("statistics:getSyncQueue"),
+    resolveSyncEntries: (ids: string[]) =>
+      invoke("statistics:resolveSyncEntries", ids),
+  },
+  ai: {
+    prepareCrashReport: (
+      versionPath: string,
+      exitCode?: number,
+      nickname?: string,
+      versionName?: string,
+      instance?: number,
+    ) =>
+      invoke(
+        "ai:prepareCrashReport",
+        versionPath,
+        exitCode,
+        nickname,
+        versionName,
+        instance,
+      ),
+    analyzeCrash: (accessToken: string, requestId: string, locale: string) =>
+      invoke("ai:analyzeCrash", accessToken, requestId, locale),
+    sendFeedback: (accessToken: string, analysisId: string, helpful: boolean) =>
+      invoke("ai:analysisFeedback", accessToken, analysisId, helpful),
+  },
+  agent: {
+    providers: {
+      list: () => invoke("agent:providers:list"),
+      save: (input: AiProviderInput) => invoke("agent:providers:save", input),
+      remove: (id: string) => invoke("agent:providers:delete", id),
+      select: (id: string) => invoke("agent:providers:select", id),
+      test: (payload: { id?: string; baseUrl?: string; apiKey?: string }) =>
+        invoke("agent:providers:test", payload),
+    },
+    models: {
+      list: (providerId: string) => invoke("agent:models:list", providerId),
+    },
+    builtin: {
+      status: (accessToken: string) =>
+        invoke("agent:builtin:status", accessToken),
+    },
+    chat: {
+      start: (runId: string, request: AgentStreamRequest) =>
+        invoke("agent:chat:start", runId, request),
+      abort: (runId: string) => invoke("agent:chat:abort", runId),
+    },
+    chats: {
+      list: () => invoke("agent:chats:list"),
+      read: (chatId: string) => invoke("agent:chats:read", chatId),
+      write: (chat: AgentStoredChat) => invoke("agent:chats:write", chat),
+      remove: (chatId: string) => invoke("agent:chats:delete", chatId),
+      tombstones: () => invoke("agent:chats:tombstones"),
+      forgetTombstone: (remoteId: string) =>
+        invoke("agent:chats:forgetTombstone", remoteId),
+      sync: (accessToken: string, pending: AgentSyncPush[]) =>
+        invoke("agent:chats:sync", accessToken, pending),
+      remoteMessages: (accessToken: string, chatId: string) =>
+        invoke("agent:chats:remoteMessages", accessToken, chatId),
+      remoteRemove: (accessToken: string, chatId: string) =>
+        invoke("agent:chats:remoteDelete", accessToken, chatId),
+    },
+  },
+  rpc: {
+    syncContext: (context: RpcRendererContext) =>
+      invoke("rpc:syncContext", context),
+  },
+  skin: {
+    get: (type: string, uuid: string, nickname: string, accessToken?: string) =>
+      invoke("skin:get", type, uuid, nickname, accessToken),
+  },
+  share: {
+    startShare: (visibility: ShareVisibility) =>
+      invoke("share:start", visibility),
+    stopShare: () => invoke("share:stop"),
+    updateShareVisibility: (visibility: ShareVisibility) =>
+      invoke("share:updateVisibility", visibility),
+    getShareState: () => invoke("share:getState"),
+    getSharePeers: () => invoke("share:getPeers"),
+    fetchActiveFriendShares: () => invoke("share:fetchActiveFriendShares"),
+    connectToFriendShare: (slug: string) =>
+      invoke("share:connectToFriendShare", slug),
+    onShareStateChanged: (callback: (state: ShareState) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: ShareState) =>
+        callback(state);
+      ipcRenderer.on("share:stateChanged", listener);
+      return () => ipcRenderer.off("share:stateChanged", listener);
+    },
+    onShareError: (callback: (error: ShareStateError) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        error: ShareStateError,
+      ) => callback(error);
+      ipcRenderer.on("share:error", listener);
+      return () => ipcRenderer.off("share:error", listener);
+    },
+    onSharePeersChanged: (callback: (peers: SharePeerInfo[]) => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        peers: SharePeerInfo[],
+      ) => callback(peers);
+      ipcRenderer.on("share:peersChanged", listener);
+      return () => ipcRenderer.off("share:peersChanged", listener);
+    },
+  },
+  events: {
+    onConsoleChangeStatus: (
+      callback: (
+        versionName: string,
+        instance: number,
+        status: "running" | "stopped" | "error",
+      ) => void,
+    ) => {
+      const listener = (_event, versionName, instance, status) => {
+        callback(versionName, instance, status);
+      };
+      ipcRenderer.on("consoleChangeStatus", listener);
+      return () => ipcRenderer.off("consoleChangeStatus", listener);
+    },
+
+    onConsoleMessage: (
+      callback: (versionName: string, instance: number, message: any) => void,
+    ) => {
+      const listener = (_event, versionName, instance, message) => {
+        callback(versionName, instance, message);
+      };
+      ipcRenderer.on("consoleMessage", listener);
+      return () => ipcRenderer.off("consoleMessage", listener);
+    },
+
+    onConsoleClear: (
+      callback: (versionName: string, instance: number) => void,
+    ) => {
+      const listener = (_event, versionName, instance) => {
+        callback(versionName, instance);
+      };
+      ipcRenderer.on("consoleClear", listener);
+      return () => ipcRenderer.off("consoleClear", listener);
+    },
+
+    onLaunch: (callback: () => void) => {
+      const listener = () => {
+        callback();
+      };
+      ipcRenderer.on("launch", listener);
+      return () => ipcRenderer.off("launch", listener);
+    },
+
+    onLaunchStalled: (callback: (payload: LaunchStalledPayload) => void) => {
+      const listener = (_event, payload: LaunchStalledPayload) => {
+        callback(payload);
+      };
+      ipcRenderer.on("launchStalled", listener);
+      return () => ipcRenderer.off("launchStalled", listener);
+    },
+
+    onUpdateFailed: (callback: (payload: UpdateFailedPayload) => void) => {
+      updateFailedSubscribers.add(callback);
+      pendingUpdateFailures.splice(0).forEach((payload) => callback(payload));
+      return () => {
+        updateFailedSubscribers.delete(callback);
+      };
+    },
+
+    onIpcError: (
+      callback: (payload: {
+        channel: string;
+        message: string;
+        notify?: boolean;
+        failure?: FailureInfo;
+      }) => void,
+    ) => {
+      const listener: IpcFailureListener = (payload) => callback(payload);
+      ipcFailureListeners.add(listener);
+      return () => {
+        ipcFailureListeners.delete(listener);
+      };
+    },
+
+    onCrashAnalysis: (
+      callback: (
+        versionName: string,
+        instance: number,
+        analysis: CrashAnalysisPayload,
+      ) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        versionName: string,
+        instance: number,
+        analysis: CrashAnalysisPayload,
+      ) => callback(versionName, instance, analysis);
+      ipcRenderer.on("crashAnalysis", listener);
+      return () => ipcRenderer.off("crashAnalysis", listener);
+    },
+
+    onCrashUnresolved: (
+      callback: (payload: ICrashUnresolvedPayload) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: ICrashUnresolvedPayload,
+      ) => callback(payload);
+      ipcRenderer.on("crashUnresolved", listener);
+      return () => ipcRenderer.off("crashUnresolved", listener);
+    },
+
+    onFriendUpdate: (callback: (data: any) => void) => {
+      const listener = (_event, data) => {
+        callback(data);
+      };
+      ipcRenderer.on("friendUpdate", listener);
+      return () => ipcRenderer.off("friendUpdate", listener);
+    },
+
+    onPlaytimeRecorded: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on("playtimeRecorded", listener);
+      return () => ipcRenderer.off("playtimeRecorded", listener);
+    },
+
+    onDownloaderInfo: (callback: (info: DownloaderInfo | null) => void) => {
+      const listener = (_event, info) => {
+        callback(info);
+      };
+      ipcRenderer.on("downloaderInfo", listener);
+      return () => ipcRenderer.off("downloaderInfo", listener);
+    },
+
+    onDownloaderFailures: (
+      callback: (info: DownloaderFailuresInfo) => void,
+    ) => {
+      const listener = (_event, info) => {
+        callback(info);
+      };
+      ipcRenderer.on("downloaderFailures", listener);
+      return () => ipcRenderer.off("downloaderFailures", listener);
+    },
+
+    onServerSyncNotice: (callback: (notice: ServerSyncNotice) => void) => {
+      const listener = (_event, notice) => {
+        callback(notice);
+      };
+      ipcRenderer.on("server:syncNotice", listener);
+      return () => ipcRenderer.off("server:syncNotice", listener);
+    },
+
+    onModsQuarantined: (
+      callback: (notice: { versionName: string; entries: string[] }) => void,
+    ) => {
+      const listener = (_event, notice) => {
+        callback(notice);
+      };
+      ipcRenderer.on("mods:quarantined", listener);
+      return () => ipcRenderer.off("mods:quarantined", listener);
+    },
+
+    onVersionInstallProgress: (
+      callback: (info: VersionInstallProgress | null) => void,
+    ) => {
+      const listener = (_event, info) => {
+        callback(info);
+      };
+      ipcRenderer.on("versionInstallProgress", listener);
+      return () => ipcRenderer.off("versionInstallProgress", listener);
+    },
+
+    onWorldBackupProgress: (
+      callback: (progress: WorldBackupProgress) => void,
+    ) => {
+      const listener = (_event, progress) => {
+        callback(progress);
+      };
+      ipcRenderer.on("worlds:backupProgress", listener);
+      return () => ipcRenderer.off("worlds:backupProgress", listener);
+    },
+
+    onArchiveExtractProgress: (
+      callback: (progress: ArchiveExtractProgress) => void,
+    ) => {
+      const listener = (_event, progress) => {
+        callback(progress);
+      };
+      ipcRenderer.on("archive:extractProgress", listener);
+      return () => ipcRenderer.off("archive:extractProgress", listener);
+    },
+
+    onAgentStream: (callback: (payload: AgentStreamEvent) => void) => {
+      const listener = (_event, payload) => {
+        callback(payload);
+      };
+      ipcRenderer.on("agent:stream", listener);
+      return () => ipcRenderer.off("agent:stream", listener);
+    },
+
+    onDeepLink: (callback: (payload: LauncherDeepLink) => void) => {
+      deepLinkSubscribers.add(callback);
+      pendingDeepLinks.splice(0).forEach((payload) => callback(payload));
+      return () => {
+        deepLinkSubscribers.delete(callback);
+      };
+    },
+
+    updater: {
+      onStatus: (callback: (payload: UpdaterStatusPayload) => void) => {
+        const listener = (
+          _event: Electron.IpcRendererEvent,
+          payload: UpdaterStatusPayload,
+        ) => {
+          callback(payload);
+        };
+        ipcRenderer.on("updater:status", listener);
+        return () => ipcRenderer.off("updater:status", listener);
+      },
+      onDownloadProgress: (callback: (progress: UpdaterProgress) => void) => {
+        const listener = (
+          _event: Electron.IpcRendererEvent,
+          progress: UpdaterProgress,
+        ) => {
+          callback(progress);
+        };
+        ipcRenderer.on("updater:downloadProgress", listener);
+        return () => ipcRenderer.off("updater:downloadProgress", listener);
+      },
+    },
+  },
+};
+
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld("api", api);
+  } catch (error) {
+    console.error(`Error exposing api to main world: ${error}`);
+  }
+} else {
+  // @ts-ignore (define in dts)
+  window.api = api;
+}
