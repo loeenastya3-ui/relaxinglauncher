@@ -439,22 +439,25 @@ async function main() {
   }
 
   if (command === "publish") {
-    agentToken();
     const notes = load(version);
     const release = await findRelease(version);
     if (!release) fail(`На GitHub нет релиза ${version} — сборка его не создала`);
     await updateGithub(release, notes, true);
-    await publishToApi(notes, false);
+    if (agentToken()) {
+      await publishToApi(notes, false);
+    } else {
+      console.log("api: RELEASE_AGENT_TOKEN не настроен — «Что нового» на бэкенд не отправляется");
+    }
     return;
   }
 
   if (command === "sync") {
-    agentToken();
     const versions = changedVersions(option(args, "--since"));
     if (!versions.length) {
       console.log("Заметки релизов не менялись");
       return;
     }
+    const agent = agentToken();
     for (const changed of versions) {
       const notes = load(changed);
       const release = await findRelease(changed);
@@ -463,7 +466,11 @@ async function main() {
         continue;
       }
       await updateGithub(release, notes, false);
-      await publishToApi(notes, true);
+      if (agent) {
+        await publishToApi(notes, true);
+      } else {
+        console.log(`${changed}: api: RELEASE_AGENT_TOKEN не настроен — обновлён только GitHub-релиз`);
+      }
     }
     return;
   }
