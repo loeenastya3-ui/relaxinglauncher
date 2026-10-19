@@ -390,7 +390,13 @@ function changedVersions(base) {
   } catch {
     from = "";
   }
-  const output = git("diff", "--name-only", "--diff-filter=AM", from || "HEAD~1", "HEAD", "--", "release-notes");
+  let output = "";
+  try {
+    output = git("diff", "--name-only", "--diff-filter=AM", from || "HEAD~1", "HEAD", "--", "release-notes");
+  } catch {
+    output = "";
+    void from;
+  }
   return output
     .split("\n")
     .map((line) => line.match(/^release-notes\/(\d+\.\d+\.\d+)\.json$/)?.[1])
