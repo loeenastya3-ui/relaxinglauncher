@@ -1,0 +1,14 @@
+{
+  "user": {
+    "id": "demo-rex",
+    "nickname": "Terra_Rex",
+    "platform": "elyby",
+    "bio": "Сборки и модпаки",
+    "createdAt": "2026-10-19T12:00:00.000Z",
+    "lastActive": "2026-10-19T12:00:00.000Z",
+    "playTimeSeconds": 4320,
+    "achievements": []
+  },
+  "modpacks": [],
+  "rank": null
+}

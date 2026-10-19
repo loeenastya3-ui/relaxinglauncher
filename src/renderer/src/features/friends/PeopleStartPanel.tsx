@@ -1,17 +1,23 @@
+﻿import { useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import {
   CircleAlert,
   Copy,
   Gamepad2,
+  Globe,
   MessagesSquare,
   Play,
-  PlugZap,
   RotateCw,
   Send,
+  UserRound,
   UserPlus,
   Users,
 } from "lucide-react";
 import { HeadDot, PlayerHead } from "@renderer/features/accounts/AccountHead";
+import {
+  communityUserToIUser,
+  loadCommunityIndex,
+} from "@renderer/features/community/staticCommunity";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@renderer/components/Hint";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +41,7 @@ interface PeopleStartPanelProps {
   ownFriendCode?: string;
   friendRequestsEnabled: boolean;
   onSignIn: () => void;
+  onViewProfile: (id: string) => void;
   describePresence: (entry: FriendEntry) => string;
   describeChat: (entry: FriendEntry) => string;
   onJoin: (friendId: string) => void;
@@ -43,6 +50,105 @@ interface PeopleStartPanelProps {
   onAddFriend: () => void;
   onCopyCode: () => void;
   t: TFunction;
+}
+
+function CommunityCatalog({
+  onViewProfile,
+  t,
+}: {
+  onViewProfile: (id: string) => void;
+  t: TFunction;
+}) {
+  const index = useQuery({
+    queryKey: ["community", "index"],
+    queryFn: () => loadCommunityIndex(true),
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+  const users = index.data?.users ?? [];
+  const isLoading = index.isPending && users.length === 0;
+  const isEmpty = !isLoading && users.length === 0;
+
+  return (
+    <section className="flex min-h-24 flex-col gap-2 rounded-xl border border-border bg-card p-3">
+      <div className="flex shrink-0 items-center gap-2">
+        <Globe className="size-4 text-faint" />
+        <p className="text-sm font-medium">{t("people.title")}</p>
+        <span className="font-mono text-xs tabular-nums text-faint">
+          {users.length}
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-1.5">
+          {Array.from({ length: 3 }).map((_, rowIndex) => (
+            <div
+              key={`community-skeleton-${rowIndex}`}
+              className="flex h-11 items-center gap-2.5 rounded-lg border border-border bg-surface-2 px-2.5"
+            >
+              <Skeleton className="size-7 shrink-0 rounded-md" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <Skeleton className="h-3 w-24 rounded" />
+                <Skeleton className="h-2.5 w-36 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : isEmpty ? (
+        <p className="px-0.5 text-xs leading-4 text-muted-foreground">
+          {t("people.emptyHint")}
+        </p>
+      ) : (
+        <div className="flex max-h-56 min-h-0 flex-col gap-1.5 overflow-y-auto">
+          {users.map((user) => {
+            const head = communityUserToIUser(user);
+            return (
+              <div
+                key={user.id}
+                role="button"
+                tabIndex={0}
+                className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-left outline-none transition-colors hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => onViewProfile(user.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onViewProfile(user.id);
+                  }
+                }}
+              >
+                <PlayerHead user={head} size={28} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="min-w-0 truncate text-sm font-medium">
+                    {user.nickname}
+                  </span>
+                  {user.bio && (
+                    <span className="min-w-0 truncate text-[11px] leading-4 text-muted-foreground">
+                      {user.bio}
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  aria-label={t("people.viewProfile")}
+                  className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface-1 text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onViewProfile(user.id);
+                  }}
+                >
+                  <UserRound className="size-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="shrink-0 px-0.5 text-[11px] leading-4 text-muted-foreground">
+        {t("people.offlineHint")}
+      </p>
+    </section>
+  );
 }
 
 function FriendCard({
@@ -158,6 +264,7 @@ export function PeopleStartPanel({
   onAddFriend,
   onCopyCode,
   onSignIn,
+  onViewProfile,
   t,
 }: PeopleStartPanelProps) {
   const redact = useRedact();
@@ -172,19 +279,11 @@ export function PeopleStartPanel({
 
   if (isSignedOut && !hasContent) {
     return (
-      <section className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden rounded-xl border border-border bg-card px-8 text-center">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-surface-3">
-          <PlugZap className="size-5 text-warning" />
-        </span>
-
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium">{t("friends.sessionLost")}</p>
-          <p className="max-w-sm text-xs leading-5 text-muted-foreground">
-            {t("friends.sessionLostHint")}
-          </p>
-        </div>
-
-        <Button onClick={onSignIn}>{t("accounts.signIn")}</Button>
+      <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card px-4 py-3">
+        <CommunityCatalog onViewProfile={onViewProfile} t={t} />
+        <Button variant="secondary" onClick={onSignIn}>
+          {t("accounts.signIn")}
+        </Button>
       </section>
     );
   }
@@ -405,50 +504,56 @@ export function PeopleStartPanel({
               {t("friends.addFriend")}
             </Button>
           </div>
+
+          <CommunityCatalog onViewProfile={onViewProfile} t={t} />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-surface-3">
-            <Users className="size-5 text-muted-foreground" />
-          </span>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-surface-3">
+              <Users className="size-5 text-muted-foreground" />
+            </span>
 
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium">{t("friends.noFriends")}</p>
-            <p className="max-w-sm text-xs leading-5 text-muted-foreground">
-              {t("friends.noFriendsHint")}
-            </p>
-          </div>
-
-          <Button onClick={onAddFriend}>
-            <UserPlus className="size-4" />
-            {t("friends.addFriend")}
-          </Button>
-
-          {ownFriendCode && (
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-1.5">
-              <span className="font-mono text-sm tracking-[0.15em] select-all">
-                {redact.value(ownFriendCode)}
-              </span>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                className="size-6"
-                aria-label={t("common.copy")}
-                onClick={onCopyCode}
-              >
-                <Copy className="size-3.5" />
-              </Button>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">{t("friends.noFriends")}</p>
+              <p className="max-w-sm text-xs leading-5 text-muted-foreground">
+                {t("friends.noFriendsHint")}
+              </p>
             </div>
-          )}
 
-          {ownFriendCode && !friendRequestsEnabled && (
-            <p className="max-w-sm text-xs leading-5 text-warning">
-              <CircleAlert className="mr-1 inline size-3.5 -translate-y-px" />
-              {t("friends.friendCodeDisabledHint")}
-            </p>
-          )}
-        </div>
-      )}
+            <Button onClick={onAddFriend}>
+              <UserPlus className="size-4" />
+              {t("friends.addFriend")}
+            </Button>
+
+            {ownFriendCode && (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-3 py-1.5">
+                <span className="font-mono text-sm tracking-[0.15em] select-all">
+                  {redact.value(ownFriendCode)}
+                </span>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="size-6"
+                  aria-label={t("common.copy")}
+                  onClick={onCopyCode}
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              </div>
+            )}
+
+            {ownFriendCode && !friendRequestsEnabled && (
+              <p className="max-w-sm text-xs leading-5 text-warning">
+                <CircleAlert className="mr-1 inline size-3.5 -translate-y-px" />
+                {t("friends.friendCodeDisabledHint")}
+              </p>
+            )}
+
+            <div className="w-full max-w-md">
+              <CommunityCatalog onViewProfile={onViewProfile} t={t} />
+            </div>
+          </div>
+        )}
     </section>
   );
 }

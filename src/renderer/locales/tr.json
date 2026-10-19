@@ -379,6 +379,12 @@
     "timeLeft": "Kalan süre",
     "linkNotConfirmed": "Erişim onaylanmadı. Bağlantıyı yeniden açın veya baştan başlayın.",
     "needsAccount": "Bağlantıları yönetmek için bir Relaxing Launcher hesabına giriş yapın."
+  },  "people": {
+    "title": "Katılımcılar",
+    "viewProfile": "Profil",
+    "offlineHint": "Relaxing'in canlı sunucuları henüz yok: bunlarla birlikte arkadaşlar ve sohbetler gelecek. Katılımcı kataloğu GitHub'da toplanıyor.",
+    "emptyHint": "Katılımcı kataloğu hâlâ boş.",
+    "loadError": "Katalog kullanılamıyor"
   },
   "friends": {
     "you": "Siz",

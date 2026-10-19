@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-19T12:00:00.000Z",
+  "users": [
+    {
+      "id": "demo-loeena",
+      "nickname": "Lioena",
+      "platform": "elyby",
+      "bio": "Создатель Relaxing Launcher",
+      "createdAt": "2026-10-19T12:00:00.000Z",
+      "lastActive": "2026-10-19T12:00:00.000Z",
+      "playTimeSeconds": 0,
+      "achievements": [],
+      "isDonor": true
+    },
+    {
+      "id": "demo-rex",
+      "nickname": "Terra_Rex",
+      "platform": "elyby",
+      "bio": "Сборки и модпаки",
+      "createdAt": "2026-10-19T12:00:00.000Z",
+      "lastActive": "2026-10-19T12:00:00.000Z",
+      "playTimeSeconds": 4320,
+      "achievements": []
+    },
+    {
+      "id": "demo-nova",
+      "nickname": "Nova",
+      "platform": "elyby",
+      "bio": "Постройки и шейдеры",
+      "createdAt": "2026-10-19T12:00:00.000Z",
+      "lastActive": "2026-10-19T12:00:00.000Z",
+      "playTimeSeconds": 1560,
+      "achievements": []
+    }
+  ]
+}

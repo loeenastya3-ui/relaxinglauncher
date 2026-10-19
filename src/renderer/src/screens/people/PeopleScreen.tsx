@@ -871,6 +871,7 @@ export function PeopleScreen({
                   isSummaryPending={realtime.isSummaryPending}
                   onReloadFriends={realtime.reloadFriends}
                   onSignIn={() => navigate({ name: "accounts" })}
+                  onViewProfile={handleViewProfile}
                   isGameRunning={isRunning}
                   ownFriendCode={friendCode.code}
                   friendRequestsEnabled={friendCode.isEnabled}

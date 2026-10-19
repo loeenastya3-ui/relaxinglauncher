@@ -1,0 +1,14 @@
+{
+  "user": {
+    "id": "demo-nova",
+    "nickname": "Nova",
+    "platform": "elyby",
+    "bio": "Постройки и шейдеры",
+    "createdAt": "2026-10-19T12:00:00.000Z",
+    "lastActive": "2026-10-19T12:00:00.000Z",
+    "playTimeSeconds": 1560,
+    "achievements": []
+  },
+  "modpacks": [],
+  "rank": null
+}

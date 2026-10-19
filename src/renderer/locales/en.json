@@ -379,6 +379,12 @@
     "timeLeft": "Time left",
     "linkNotConfirmed": "Access was not confirmed. Open the link again or start over.",
     "needsAccount": "Sign in to a Relaxing Launcher account to manage connections."
+  },  "people": {
+    "title": "Members",
+    "viewProfile": "Profile",
+    "offlineHint": "Relaxing's live services are not up yet: friends and chats arrive with them. The member catalog is hosted on GitHub.",
+    "emptyHint": "The member catalog is still empty.",
+    "loadError": "Catalog is unavailable"
   },
   "friends": {
     "you": "You",

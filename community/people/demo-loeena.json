@@ -1,0 +1,15 @@
+{
+  "user": {
+    "id": "demo-loeena",
+    "nickname": "Lioena",
+    "platform": "elyby",
+    "bio": "Создатель Relaxing Launcher",
+    "createdAt": "2026-10-19T12:00:00.000Z",
+    "lastActive": "2026-10-19T12:00:00.000Z",
+    "playTimeSeconds": 0,
+    "achievements": [],
+    "isDonor": true
+  },
+  "modpacks": [],
+  "rank": null
+}

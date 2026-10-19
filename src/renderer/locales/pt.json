@@ -379,6 +379,12 @@
     "timeLeft": "Tempo restante",
     "linkNotConfirmed": "O acesso não foi confirmado. Abra o link de novo ou comece do zero.",
     "needsAccount": "Entre em uma conta do Relaxing Launcher para gerenciar as conexões."
+  },  "people": {
+    "title": "Participantes",
+    "viewProfile": "Perfil",
+    "offlineHint": "Os servidores ativos do Relaxing ainda não iniciaram: amigos e chats chegarão com eles. O catálogo de participantes é mantido no GitHub.",
+    "emptyHint": "O catálogo de participantes ainda está vazio.",
+    "loadError": "Catálogo indisponível"
   },
   "friends": {
     "you": "Você",
