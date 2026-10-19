@@ -114,7 +114,7 @@ describe("buildSharedPack", () => {
           _id: "user-9",
           nickname: "pashka4005",
           platform: "microsoft",
-          headUrl: "https://api.relaxinglauncher.com/skins/head/user/user-9.png",
+          headUrl: "https://api.grubielauncher.com/skins/head/user/user-9.png",
         } as never,
       }),
       { takenNames: [] },
@@ -124,7 +124,7 @@ describe("buildSharedPack", () => {
       id: "user-9",
       nickname: "pashka4005",
       platform: "microsoft",
-      headUrl: "https://api.relaxinglauncher.com/skins/head/user/user-9.png",
+      headUrl: "https://api.grubielauncher.com/skins/head/user/user-9.png",
     });
     expect(pack.downloads).toBe(42);
   });

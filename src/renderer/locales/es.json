@@ -325,7 +325,7 @@
   },
   "webLogin": {
     "title": "Iniciar sesión en el sitio",
-    "bodyNoName": "¿Permitir el inicio de sesión en relaxinglauncher.com?",
+    "bodyNoName": "¿Permitir el inicio de sesión en grubielauncher.com?",
     "hint": "Apruébelo solo si usted mismo lo inició en el sitio web.",
     "codeLabel": "Código de confirmación",
     "codeHint": "Permita el inicio de sesión solo si el sitio web muestra el mismo código.",
@@ -983,7 +983,7 @@
     },
     "help": {
       "fromServer": {
-        "1": "El código del paquete es la parte final de un enlace relaxinglauncher.com/pack/…; el enlace completo también sirve.",
+        "1": "El código del paquete es la parte final de un enlace grubielauncher.com/pack/…; el enlace completo también sirve.",
         "2": "El launcher descarga exactamente los mismos mods, configuraciones y servidores que tiene el autor.",
         "3": "Cuando el autor actualice el paquete, recibirá un aviso y podrá sincronizarse."
       },
@@ -5468,7 +5468,7 @@
     "title": "{{version}} está tardando demasiado en iniciar",
     "silent": "El proceso del juego lleva mucho tiempo sin escribir nada. Envíe un informe: muestra dónde se detuvo el inicio.",
     "quiet": "El juego dejó de escribir en el registro. Envíe un informe: muestra dónde se detuvo el inicio.",
-    "auth": "El juego se detuvo en el inicio de sesión, antes de que arrancara Minecraft. Suele deberse a una VPN, un proxy, una herramienta para evadir DPI (Zapret, GoodbyeDPI) o un antivirus: desactívelos mientras juega o agregue relaxinglauncher.com y javaw.exe a sus exclusiones. Si no ayuda, envíe un informe.",
+    "auth": "El juego se detuvo en el inicio de sesión, antes de que arrancara Minecraft. Suele deberse a una VPN, un proxy, una herramienta para evadir DPI (Zapret, GoodbyeDPI) o un antivirus: desactívelos mientras juega o agregue grubielauncher.com y javaw.exe a sus exclusiones. Si no ayuda, envíe un informe.",
     "report": "Enviar informe"
   },
   "jarMods": {

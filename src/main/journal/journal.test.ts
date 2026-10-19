@@ -83,7 +83,7 @@ describe("describeError", () => {
       code: "ERR_BAD_RESPONSE",
       config: {
         method: "get",
-        baseURL: "https://api.relaxinglauncher.com",
+        baseURL: "https://api.grubielauncher.com",
         url: "/modpacks/abc?token=secret",
       },
       response: { status: 503 },
@@ -92,7 +92,7 @@ describe("describeError", () => {
     expect(described).toMatchObject({
       status: 503,
       method: "GET",
-      url: "https://api.relaxinglauncher.com/modpacks/abc",
+      url: "https://api.grubielauncher.com/modpacks/abc",
     });
   });
 });
@@ -123,12 +123,12 @@ describe("describeRequestTarget", () => {
     expect(
       describeRequestTarget({
         method: "post",
-        baseURL: "https://api.relaxinglauncher.com",
+        baseURL: "https://api.grubielauncher.com",
         url: "/support-reports?x=1",
       }),
     ).toEqual({
       method: "POST",
-      target: "api.relaxinglauncher.com/support-reports",
+      target: "api.grubielauncher.com/support-reports",
       hasQuery: true,
     });
   });

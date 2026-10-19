@@ -78,7 +78,7 @@ describe("share sync pure helpers", () => {
   it("detects local shared files that still point to another modpack prefix", () => {
     expect(
       getRemoteModpackIdFromUrl(
-        "https://cdn.relaxinglauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
+        "https://cdn.grubielauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
       ),
     ).toBe("old-pack");
 
@@ -86,7 +86,7 @@ describe("share sync pure helpers", () => {
       hasLocalFilesOutsideCurrentShare(
         [
           localMod({
-            url: "https://cdn.relaxinglauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
+            url: "https://cdn.grubielauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
           }),
         ],
         "current-pack",
@@ -97,7 +97,7 @@ describe("share sync pure helpers", () => {
       hasLocalFilesOutsideCurrentShare(
         [
           localMod({
-            url: "https://cdn.relaxinglauncher.com/modpacks/current-pack/shaderpacks/shader.txt",
+            url: "https://cdn.grubielauncher.com/modpacks/current-pack/shaderpacks/shader.txt",
           }),
         ],
         "current-pack",
@@ -108,7 +108,7 @@ describe("share sync pure helpers", () => {
   it("reports stale local share files only for pack owners", () => {
     const mods = [
       localMod({
-        url: "https://cdn.relaxinglauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
+        url: "https://cdn.grubielauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
       }),
     ];
 

@@ -19,7 +19,7 @@ describe("jar mod sets", () => {
     const local = { jarMods: [bta] };
     const published = {
       jarMods: [
-        { ...bta, url: "https://cdn.relaxinglauncher.com/x.jar", sha1: "s" },
+        { ...bta, url: "https://cdn.grubielauncher.com/x.jar", sha1: "s" },
       ],
     };
 

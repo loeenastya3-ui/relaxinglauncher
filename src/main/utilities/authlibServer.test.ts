@@ -17,7 +17,7 @@ import { encodeAuthlibMetadata, resolveAuthlibServer } from "./authlibServer";
 
 const metadata = {
   meta: { serverName: "Relaxing Launcher" },
-  skinDomains: ["cdn.relaxinglauncher.com"],
+  skinDomains: ["cdn.grubielauncher.com"],
   signaturePublickey: "-----BEGIN PUBLIC KEY-----\nKEY\n-----END PUBLIC KEY-----",
 };
 
@@ -48,13 +48,13 @@ describe("resolveAuthlibServer", () => {
 
   it("uses the Relaxing API host that answered, including the direct route", async () => {
     getYggdrasilMetadataMock.mockResolvedValue({
-      baseUrl: "https://direct.relaxinglauncher.com",
+      baseUrl: "https://direct.grubielauncher.com",
       metadata,
     });
 
     const server = await resolveAuthlibServer("discord");
 
-    expect(server?.url).toBe("https://direct.relaxinglauncher.com/yggdrasil");
+    expect(server?.url).toBe("https://direct.grubielauncher.com/yggdrasil");
     expect(server && decode(server.prefetched)).toEqual(metadata);
   });
 

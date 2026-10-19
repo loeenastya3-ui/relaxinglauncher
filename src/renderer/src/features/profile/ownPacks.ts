@@ -4,7 +4,7 @@ type PackIdentity = Pick<IModpack, "_id" | "shareCode">;
 
 // The code a published build is known by everywhere outside the database: it
 // names the build's storage folder, it is what `relaxinglauncher://pack/<code>`
-// and `relaxinglauncher.com/pack/<code>` carry, and it is what an instance keeps
+// and `grubielauncher.com/pack/<code>` carry, and it is what an instance keeps
 // locally after it was published.
 //
 // The row id is NOT interchangeable with it. The backend serves a build by id

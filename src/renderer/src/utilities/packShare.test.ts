@@ -8,7 +8,7 @@ import {
 describe("pack share utilities", () => {
   it("builds public pack urls", () => {
     expect(buildPackShareUrl("6a10a2e421437b64b32425f9")).toBe(
-      "https://relaxinglauncher.com/pack/6a10a2e421437b64b32425f9",
+      "https://grubielauncher.com/pack/6a10a2e421437b64b32425f9",
     );
   });
 
@@ -21,7 +21,7 @@ describe("pack share utilities", () => {
     );
     expect(
       parsePackShareCode(
-        "https://relaxinglauncher.com/ru/pack/6a10a2e421437b64b32425f9",
+        "https://grubielauncher.com/ru/pack/6a10a2e421437b64b32425f9",
       ),
     ).toBe("6a10a2e421437b64b32425f9");
   });

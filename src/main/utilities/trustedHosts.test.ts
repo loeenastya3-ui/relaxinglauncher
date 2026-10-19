@@ -23,7 +23,7 @@ describe("isTrustedDownloadUrl", () => {
     ).toBe(true);
     expect(isTrustedDownloadUrl("https://maven.neoforged.net/x.jar")).toBe(true);
     expect(
-      isTrustedDownloadUrl("https://api.relaxinglauncher.com/loaders/forge.json"),
+      isTrustedDownloadUrl("https://api.grubielauncher.com/loaders/forge.json"),
     ).toBe(true);
   });
 

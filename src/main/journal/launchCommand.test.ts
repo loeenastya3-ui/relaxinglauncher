@@ -55,7 +55,7 @@ describe("launch command description", () => {
   it("reads java agent paths with and without quotes", () => {
     expect(
       javaAgentPaths([
-        "-javaagent:C:\\libs\\authlib-injector.jar=relaxinglauncher.com",
+        "-javaagent:C:\\libs\\authlib-injector.jar=grubielauncher.com",
         '-javaagent:"C:\\my libs\\agent.jar"=ely.by',
       ]),
     ).toEqual(["C:\\libs\\authlib-injector.jar", "C:\\my libs\\agent.jar"]);

@@ -13,7 +13,7 @@ vi.mock("../services/Backend", () => ({
       folder: string,
     ) {
       uploads.push([path.basename(filePath), name, folder]);
-      return `https://cdn.relaxinglauncher.com/${folder}/${name}`;
+      return `https://cdn.grubielauncher.com/${folder}/${name}`;
     }
   },
 }));
@@ -42,7 +42,7 @@ describe("uploadJarMods", () => {
           file: "kept.jar",
           name: "Kept",
           enabled: false,
-          url: "https://cdn.relaxinglauncher.com/modpacks/code/jarmods/kept.jar",
+          url: "https://cdn.grubielauncher.com/modpacks/code/jarmods/kept.jar",
         },
       ],
       main: { file: "m.jar", name: "minecraft.jar", enabled: true },
@@ -56,7 +56,7 @@ describe("uploadJarMods", () => {
       file: "a.jar",
       name: "BTA",
       enabled: true,
-      url: "https://cdn.relaxinglauncher.com/modpacks/code/jarmods/a.jar",
+      url: "https://cdn.grubielauncher.com/modpacks/code/jarmods/a.jar",
       sha1: expect.stringMatching(/^[0-9a-f]{40}$/),
       size: 5,
     });
@@ -87,7 +87,7 @@ describe("uploadJarMods", () => {
           file: "a.jar",
           name: "BTA",
           enabled: true,
-          url: "https://cdn.relaxinglauncher.com/modpacks/other/jarmods/a.jar",
+          url: "https://cdn.grubielauncher.com/modpacks/other/jarmods/a.jar",
         },
       ],
       main: null,

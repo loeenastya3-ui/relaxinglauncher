@@ -161,17 +161,17 @@ describe("parseTunnelControlMessage", () => {
 
 describe("isValidGatewayUrl", () => {
   it("accepts the production gateway over TLS", () => {
-    expect(isValidGatewayUrl("wss://tunnel.relaxinglauncher.com/ws")).toBe(true);
+    expect(isValidGatewayUrl("wss://tunnel.grubielauncher.com/ws")).toBe(true);
     expect(isValidGatewayUrl("")).toBe(true);
   });
 
   it("refuses plaintext and foreign hosts", () => {
-    expect(isValidGatewayUrl("ws://tunnel.relaxinglauncher.com/ws")).toBe(false);
+    expect(isValidGatewayUrl("ws://tunnel.grubielauncher.com/ws")).toBe(false);
     expect(isValidGatewayUrl("wss://evil.example.com/ws")).toBe(false);
-    expect(isValidGatewayUrl("wss://relaxinglauncher.com.evil.example/ws")).toBe(
+    expect(isValidGatewayUrl("wss://grubielauncher.com.evil.example/ws")).toBe(
       false,
     );
-    expect(isValidGatewayUrl("http://tunnel.relaxinglauncher.com/ws")).toBe(false);
+    expect(isValidGatewayUrl("http://tunnel.grubielauncher.com/ws")).toBe(false);
     expect(isValidGatewayUrl("not a url")).toBe(false);
   });
 

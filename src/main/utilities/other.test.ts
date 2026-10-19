@@ -8,7 +8,7 @@ describe("getJavaAgent", () => {
 
   it("keeps the public Relaxing auth server for Relaxing/Discord accounts", () => {
     expect(getJavaAgent("discord", "authlib-injector.jar")).toBe(
-      "-javaagent:authlib-injector.jar=relaxinglauncher.com",
+      "-javaagent:authlib-injector.jar=grubielauncher.com",
     );
   });
 
@@ -24,10 +24,10 @@ describe("getJavaAgent", () => {
         "discord",
         "authlib-injector.jar",
         false,
-        "https://direct.relaxinglauncher.com/yggdrasil",
+        "https://direct.grubielauncher.com/yggdrasil",
       ),
     ).toBe(
-      "-javaagent:authlib-injector.jar=https://direct.relaxinglauncher.com/yggdrasil",
+      "-javaagent:authlib-injector.jar=https://direct.grubielauncher.com/yggdrasil",
     );
   });
 });

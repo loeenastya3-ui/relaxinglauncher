@@ -132,7 +132,7 @@ export function AgentComposer({
             onClick={() =>
               void window.api.shell
                 .openExternal(
-                  `https://relaxinglauncher.com/${i18n.resolvedLanguage ?? "en"}/donate`,
+                  `https://grubielauncher.com/${i18n.resolvedLanguage ?? "en"}/donate`,
                 )
                 .catch(() => undefined)
             }

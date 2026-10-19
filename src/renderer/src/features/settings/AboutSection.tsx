@@ -136,7 +136,7 @@ export function AboutSection({
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  open(`https://relaxinglauncher.com/${i18n.language}/donate`)
+                  open(`https://grubielauncher.com/${i18n.language}/donate`)
                 }
               >
                 <Heart className="size-3.5" />

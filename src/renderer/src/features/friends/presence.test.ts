@@ -33,7 +33,7 @@ function makeShare(patch: Partial<ActiveFriendShare> = {}): ActiveFriendShare {
     hostNickname: "Steve",
     slug: "slug",
     visibility: "friends",
-    publicAddress: "join.relaxinglauncher.com:25565",
+    publicAddress: "join.grubielauncher.com:25565",
     startedAt: "2026-08-15T10:00:00Z",
     ...patch,
   };

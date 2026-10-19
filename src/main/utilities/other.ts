@@ -145,7 +145,7 @@ export function getJavaAgent(
       authServer = `ely.by`;
       break;
     case "discord":
-      authServer = `relaxinglauncher.com`;
+      authServer = `grubielauncher.com`;
       break;
   }
   if (server) authServer = server;

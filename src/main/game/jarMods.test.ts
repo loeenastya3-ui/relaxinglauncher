@@ -333,7 +333,7 @@ describe("importJarMods", () => {
 });
 
 describe("published jar mods", () => {
-  const url = "https://cdn.relaxinglauncher.com/modpacks/abc/jarmods/";
+  const url = "https://cdn.grubielauncher.com/modpacks/abc/jarmods/";
 
   it("downloads only the published files that are missing", async () => {
     const items = await jarModDownloads(root, {

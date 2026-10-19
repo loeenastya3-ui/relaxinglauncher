@@ -39,7 +39,7 @@ describe("news feed model", () => {
     expect(newsSource("https://www.minecraft.net/en-us/article/x")).toBe(
       "minecraft",
     );
-    expect(newsSource("https://relaxinglauncher.com/ru/changelog")).toBe(
+    expect(newsSource("https://grubielauncher.com/ru/changelog")).toBe(
       "relaxing",
     );
     expect(newsSource("https://example.com/x")).toBe("other");
@@ -93,7 +93,7 @@ describe("news feed model", () => {
   it("lists only the sources actually present, brand first", () => {
     const cards = buildNewsCards([
       item(),
-      item({ url: "https://relaxinglauncher.com/news/1" }),
+      item({ url: "https://grubielauncher.com/news/1" }),
     ]);
 
     expect(availableSources(cards)).toEqual(["relaxing", "minecraft"]);
@@ -105,7 +105,7 @@ describe("news feed model", () => {
     const ours = (version: string, time: number) =>
       item({
         title: `Relaxing Launcher ${version}`,
-        url: `https://relaxinglauncher.com/ru/changelog#v${version}`,
+        url: `https://grubielauncher.com/ru/changelog#v${version}`,
         time,
       });
 
@@ -134,7 +134,7 @@ describe("news feed model", () => {
     const ours = (version: string, time: number) =>
       item({
         title: `Relaxing Launcher ${version}`,
-        url: `https://relaxinglauncher.com/ru/changelog#v${version}`,
+        url: `https://grubielauncher.com/ru/changelog#v${version}`,
         time,
       });
 
@@ -286,7 +286,7 @@ describe("resolveFeedOutcome", () => {
 describe("countForSource", () => {
   const items = [
     { url: "https://www.minecraft.net/en-us/article/a" },
-    { url: "https://relaxinglauncher.com/news/b" },
+    { url: "https://grubielauncher.com/news/b" },
     { url: "https://www.minecraft.net/en-us/article/c" },
   ];
 

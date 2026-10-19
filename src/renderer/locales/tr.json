@@ -325,7 +325,7 @@
   },
   "webLogin": {
     "title": "Siteye giriş",
-    "bodyNoName": "relaxinglauncher.com’a giriş yapılmasına izin verilsin mi?",
+    "bodyNoName": "grubielauncher.com’a giriş yapılmasına izin verilsin mi?",
     "hint": "Bunu yalnızca girişi web sitesinde kendiniz başlattıysanız onaylayın.",
     "codeLabel": "Onay kodu",
     "codeHint": "Girişe yalnızca web sitesi aynı kodu gösteriyorsa izin verin.",
@@ -972,7 +972,7 @@
     },
     "help": {
       "fromServer": {
-        "1": "Paket kodu, relaxinglauncher.com/pack/… bağlantısının sonundaki kısımdır — bağlantının kendisi de çalışır.",
+        "1": "Paket kodu, grubielauncher.com/pack/… bağlantısının sonundaki kısımdır — bağlantının kendisi de çalışır.",
         "2": "Başlatıcı, yazardaki modların, yapılandırmaların ve sunucuların tamamen aynısını indirir.",
         "3": "Yazar paketi güncellediğinde bir bildirim alır ve onunla eşitleyebilirsiniz."
       },
@@ -5424,7 +5424,7 @@
     "title": "{{version}} başlaması çok uzun sürüyor",
     "silent": "Oyun işlemi uzun süredir hiçbir şey yazmadı. Rapor gönderin — başlatmanın nerede durduğunu gösterir.",
     "quiet": "Oyun günlüğe yazmayı bıraktı. Rapor gönderin — başlatmanın nerede durduğunu gösterir.",
-    "auth": "Oyun, Minecraft başlamadan önce girişte durdu. Bunun nedeni genellikle bir VPN, proxy, DPI atlatma aracı (Zapret, GoodbyeDPI) veya antivirüstür: oynarken onları kapatın ya da relaxinglauncher.com ve javaw.exe’yi istisnalarına ekleyin. Bu işe yaramazsa rapor gönderin.",
+    "auth": "Oyun, Minecraft başlamadan önce girişte durdu. Bunun nedeni genellikle bir VPN, proxy, DPI atlatma aracı (Zapret, GoodbyeDPI) veya antivirüstür: oynarken onları kapatın ya da grubielauncher.com ve javaw.exe’yi istisnalarına ekleyin. Bu işe yaramazsa rapor gönderin.",
     "report": "Rapor gönder"
   },
   "jarMods": {

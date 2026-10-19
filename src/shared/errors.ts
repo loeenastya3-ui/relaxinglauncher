@@ -113,8 +113,8 @@ const CAUSE_CODES: Record<FailureCause, string> = {
 };
 
 const HOST_SIDES: Array<[string, FailureSide]> = [
-  ["mirror.relaxinglauncher.com", "mirror"],
-  ["relaxinglauncher.com", "relaxing"],
+  ["mirror.grubielauncher.com", "mirror"],
+  ["grubielauncher.com", "relaxing"],
   ["forgecdn.net", "curseforge"],
   ["curseforge.com", "curseforge"],
   ["modrinth.com", "modrinth"],

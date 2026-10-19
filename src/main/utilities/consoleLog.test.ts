@@ -16,7 +16,7 @@ describe("console stream classifier", () => {
   it("treats authlib-injector INFO on stderr as info, not error", () => {
     expect(
       classifyConsoleStream(
-        "[authlib-injector] [INFO] Authentication server: https://relaxinglauncher.com",
+        "[authlib-injector] [INFO] Authentication server: https://grubielauncher.com",
         "stderr",
       ),
     ).toBe("info");

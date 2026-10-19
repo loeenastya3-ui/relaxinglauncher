@@ -325,7 +325,7 @@
   },
   "webLogin": {
     "title": "Connexion au site",
-    "bodyNoName": "Autoriser la connexion à relaxinglauncher.com ?",
+    "bodyNoName": "Autoriser la connexion à grubielauncher.com ?",
     "hint": "N’approuvez que si vous l’avez lancée vous-même sur le site.",
     "codeLabel": "Code de confirmation",
     "codeHint": "N’autorisez la connexion que si le site affiche le même code.",
@@ -983,7 +983,7 @@
     },
     "help": {
       "fromServer": {
-        "1": "Le code du pack est la fin d’un lien relaxinglauncher.com/pack/… — le lien lui-même fonctionne aussi.",
+        "1": "Le code du pack est la fin d’un lien grubielauncher.com/pack/… — le lien lui-même fonctionne aussi.",
         "2": "Le launcher télécharge exactement les mêmes mods, configs et serveurs que l’auteur.",
         "3": "Quand l’auteur met à jour le pack, vous êtes prévenu et pouvez vous synchroniser."
       },
@@ -5472,7 +5472,7 @@
     "title": "{{version}} met trop de temps à démarrer",
     "silent": "Le processus du jeu n’a rien écrit depuis longtemps. Envoyez un rapport — il montre où le lancement s’est arrêté.",
     "quiet": "Le jeu a cessé d’écrire dans le journal. Envoyez un rapport — il montre où le lancement s’est arrêté.",
-    "auth": "Le jeu s’est arrêté à la connexion, avant le démarrage de Minecraft. C’est généralement dû à un VPN, un proxy, un outil de contournement du DPI (Zapret, GoodbyeDPI) ou un antivirus : désactivez-les pendant que vous jouez ou ajoutez relaxinglauncher.com et javaw.exe à leurs exclusions. Si cela ne suffit pas, envoyez un rapport.",
+    "auth": "Le jeu s’est arrêté à la connexion, avant le démarrage de Minecraft. C’est généralement dû à un VPN, un proxy, un outil de contournement du DPI (Zapret, GoodbyeDPI) ou un antivirus : désactivez-les pendant que vous jouez ou ajoutez grubielauncher.com et javaw.exe à leurs exclusions. Si cela ne suffit pas, envoyez un rapport.",
     "report": "Envoyer un rapport"
   },
   "jarMods": {

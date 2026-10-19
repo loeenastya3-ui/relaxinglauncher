@@ -139,7 +139,7 @@ const CSP_POLICY = [
 
 const CSP_REPORT_ONLY_POLICY = "require-trusted-types-for 'script'";
 
-const CDN_CORS_HOST = "cdn.relaxinglauncher.com";
+const CDN_CORS_HOST = "cdn.grubielauncher.com";
 
 const APP_MEDIA_TYPES_BY_EXTENSION = new Map<string, string>([
   [".png", "image/png"],

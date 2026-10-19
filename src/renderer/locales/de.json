@@ -325,7 +325,7 @@
   },
   "webLogin": {
     "title": "Auf der Website anmelden",
-    "bodyNoName": "Anmeldung auf relaxinglauncher.com erlauben?",
+    "bodyNoName": "Anmeldung auf grubielauncher.com erlauben?",
     "hint": "Bestätigen Sie nur, wenn Sie die Anmeldung selbst auf der Website gestartet haben.",
     "codeLabel": "Bestätigungscode",
     "codeHint": "Erlauben Sie die Anmeldung nur, wenn die Website denselben Code anzeigt.",
@@ -972,7 +972,7 @@
     },
     "help": {
       "fromServer": {
-        "1": "Der Paketcode ist das Ende eines relaxinglauncher.com/pack/…-Links – der Link selbst funktioniert auch.",
+        "1": "Der Paketcode ist das Ende eines grubielauncher.com/pack/…-Links – der Link selbst funktioniert auch.",
         "2": "Der Launcher lädt genau dieselben Mods, Konfigurationen und Server herunter wie beim Autor.",
         "3": "Wenn der Autor das Paket aktualisiert, erhalten Sie einen Hinweis und können synchronisieren."
       },
@@ -5424,7 +5424,7 @@
     "title": "{{version}} braucht zu lange zum Starten",
     "silent": "Der Spielprozess hat lange nichts geschrieben. Senden Sie einen Bericht – er zeigt, wo der Start hängen geblieben ist.",
     "quiet": "Das Spiel schreibt nicht mehr ins Log. Senden Sie einen Bericht – er zeigt, wo der Start hängen geblieben ist.",
-    "auth": "Das Spiel ist bei der Anmeldung stehen geblieben, bevor Minecraft gestartet ist. Meist liegt das an einem VPN, Proxy, DPI-Umgehungstool (Zapret, GoodbyeDPI) oder Virenscanner: Schalten Sie diese beim Spielen ab oder fügen Sie relaxinglauncher.com und javaw.exe zu ihren Ausnahmen hinzu. Wenn das nicht hilft, senden Sie einen Bericht.",
+    "auth": "Das Spiel ist bei der Anmeldung stehen geblieben, bevor Minecraft gestartet ist. Meist liegt das an einem VPN, Proxy, DPI-Umgehungstool (Zapret, GoodbyeDPI) oder Virenscanner: Schalten Sie diese beim Spielen ab oder fügen Sie grubielauncher.com und javaw.exe zu ihren Ausnahmen hinzu. Wenn das nicht hilft, senden Sie einen Bericht.",
     "report": "Bericht senden"
   },
   "jarMods": {

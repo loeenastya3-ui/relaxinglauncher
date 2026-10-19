@@ -1,7 +1,7 @@
 import { DownloadSource } from "@/types/Settings";
 
-export const MIRROR_BASE = "https://mirror.relaxinglauncher.com";
-export const MIRROR_BASE_DIRECT = "https://direct-mirror.relaxinglauncher.com";
+export const MIRROR_BASE = "https://mirror.grubielauncher.com";
+export const MIRROR_BASE_DIRECT = "https://direct-mirror.grubielauncher.com";
 
 const HOST_TO_PREFIX: Record<string, string> = {
   "piston-meta.mojang.com": "piston-meta",
@@ -25,7 +25,7 @@ const HOST_TO_PREFIX: Record<string, string> = {
   "cdn.modrinth.com": "modrinth",
   "edge.forgecdn.net": "forgecdn",
   "mediafilez.forgecdn.net": "forgecdn",
-  "cdn.relaxinglauncher.com": "storage",
+  "cdn.grubielauncher.com": "storage",
 };
 
 const TEMURIN_RELEASE_PATH = /^\/adoptium\/[^/]+-binaries\/releases\/download\//i;

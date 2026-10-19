@@ -88,7 +88,7 @@ describe("startShare handshake", () => {
     startShareMock.mockResolvedValue({
       sessionId: "11111111-1111-4111-8111-111111111111",
       slug: "abcdefgh",
-      publicAddress: "abcdefgh.join.relaxinglauncher.com",
+      publicAddress: "abcdefgh.join.grubielauncher.com",
       gatewayUrl: `ws://127.0.0.1:${gatewayPort}`,
       gatewayToken: "gw-token",
       visibility: "friends",

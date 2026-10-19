@@ -13,9 +13,9 @@ describe("keepOwnServers", () => {
       keepOwnServers(
         [
           server("World of NoctVale", "friend.example.net"),
-          server("Relaxing Demo", "demo.relaxinglauncher.com"),
+          server("Relaxing Demo", "demo.grubielauncher.com"),
         ],
-        [server("Relaxing Demo", "demo.relaxinglauncher.com")],
+        [server("Relaxing Demo", "demo.grubielauncher.com")],
       ),
     ).toEqual([server("World of NoctVale", "friend.example.net")]);
   });

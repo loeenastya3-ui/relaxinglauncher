@@ -325,7 +325,7 @@
   },
   "webLogin": {
     "title": "Logowanie na stronie",
-    "bodyNoName": "Zezwolić na logowanie na relaxinglauncher.com?",
+    "bodyNoName": "Zezwolić na logowanie na grubielauncher.com?",
     "hint": "Zatwierdź tylko wtedy, gdy logowanie rozpoczęto samodzielnie na stronie.",
     "codeLabel": "Kod potwierdzenia",
     "codeHint": "Zezwól na logowanie tylko wtedy, gdy strona pokazuje ten sam kod.",
@@ -994,7 +994,7 @@
     },
     "help": {
       "fromServer": {
-        "1": "Kod paczki to końcówka linku relaxinglauncher.com/pack/… — sam link też zadziała.",
+        "1": "Kod paczki to końcówka linku grubielauncher.com/pack/… — sam link też zadziała.",
         "2": "Launcher pobiera dokładnie te same mody, konfiguracje i serwery, które ma autor.",
         "3": "Gdy autor zaktualizuje paczkę, pojawi się powiadomienie i będzie można ją zsynchronizować."
       },
@@ -5520,7 +5520,7 @@
     "title": "{{version}} uruchamia się zbyt długo",
     "silent": "Proces gry od dawna niczego nie zapisał. Wyślij raport — pokaże, gdzie uruchamianie się zatrzymało.",
     "quiet": "Gra przestała pisać do logu. Wyślij raport — pokaże, gdzie uruchamianie się zatrzymało.",
-    "auth": "Gra zatrzymała się na logowaniu, zanim Minecraft się uruchomił. Zwykle powoduje to VPN, proxy, narzędzie do omijania DPI (Zapret, GoodbyeDPI) lub antywirus: wyłącz je na czas gry albo dodaj relaxinglauncher.com i javaw.exe do ich wyjątków. Jeśli to nie pomoże, wyślij raport.",
+    "auth": "Gra zatrzymała się na logowaniu, zanim Minecraft się uruchomił. Zwykle powoduje to VPN, proxy, narzędzie do omijania DPI (Zapret, GoodbyeDPI) lub antywirus: wyłącz je na czas gry albo dodaj grubielauncher.com i javaw.exe do ich wyjątków. Jeśli to nie pomoże, wyślij raport.",
     "report": "Wyślij raport"
   },
   "jarMods": {

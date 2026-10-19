@@ -8,7 +8,7 @@ import { isSafeRemoteFetchUrl, isSafeRemoteImageUrl } from "./safeUrl";
 describe("isSafeRemoteImageUrl", () => {
   it("accepts public https avatar urls", () => {
     expect(
-      isSafeRemoteImageUrl("https://api.relaxinglauncher.com/avatars/x.png"),
+      isSafeRemoteImageUrl("https://api.grubielauncher.com/avatars/x.png"),
     ).toBe(true);
   });
 
@@ -50,7 +50,7 @@ describe("isSafeRemoteFetchUrl", () => {
   it("accepts a host that resolves to public addresses only", async () => {
     lookup.mockResolvedValueOnce([{ address: "104.18.0.1", family: 4 }]);
     await expect(
-      isSafeRemoteFetchUrl("https://cdn.relaxinglauncher.com/a.png"),
+      isSafeRemoteFetchUrl("https://cdn.grubielauncher.com/a.png"),
     ).resolves.toBe(true);
   });
 

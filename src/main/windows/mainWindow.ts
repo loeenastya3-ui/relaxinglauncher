@@ -14,7 +14,7 @@ const MIN_WIDTH = 1280;
 const MIN_HEIGHT = 720;
 
 const AUTO_OPEN_HOST_SUFFIXES = [
-  "relaxinglauncher.com",
+  "grubielauncher.com",
   "modrinth.com",
   "curseforge.com",
   "github.com",

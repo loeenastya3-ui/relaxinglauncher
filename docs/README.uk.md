@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://relaxinglauncher.com/">relaxinglauncher.com</a>
+  <a href="https://grubielauncher.com/">grubielauncher.com</a>
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@
 - Імпорт із файлу: збірки Relaxing, CurseForge, Modrinth (`.mrpack`), Prism і MultiMC — перетягніть архів у вікно.
 - Експорт збірки в архів: до копії потрапляють моди, конфіги та світи.
 - Публікація збірки й код доступу: усі, хто її встановив, побачать ваше наступне оновлення разом зі списком змін і синхронізують його в один клік.
-- Каталог публічних збірок спільноти — і в самому лаунчері, і на [relaxinglauncher.com/packs](https://relaxinglauncher.com/packs).
+- Каталог публічних збірок спільноти — і в самому лаунчері, і на [grubielauncher.com/packs](https://grubielauncher.com/packs).
 - Перевірка цілісності: пошкоджені та відсутні файли завантажуються заново.
 - Редактор конфігів із пошуком, автодоповненням і збереженими версіями, до яких можна відкотитися.
 - Редактор чанків для світів: мапа згенерованих чанків за вимірами з виглядом на місцевість із супутника, фільтри для невідвіданих, застарілих і пошкоджених чанків та видалення з попередньою резервною копією.
@@ -124,8 +124,8 @@
 
 # Посилання
 
-- **Сайт:** [relaxinglauncher.com](https://relaxinglauncher.com/)
+- **Сайт:** [grubielauncher.com](https://grubielauncher.com/)
 - **Завантаження:** [Releases](https://github.com/loeenastya3-ui/relaxinglauncher/releases)
-- **Історія змін:** [relaxinglauncher.com/changelog](https://relaxinglauncher.com/changelog)
+- **Історія змін:** [grubielauncher.com/changelog](https://grubielauncher.com/changelog)
 - **Discord:** [сервер Relaxing Launcher](https://discord.com/invite/URrKha9hk7)
-- **Політика конфіденційності:** [relaxinglauncher.com/privacy](https://relaxinglauncher.com/privacy)
+- **Політика конфіденційності:** [grubielauncher.com/privacy](https://grubielauncher.com/privacy)

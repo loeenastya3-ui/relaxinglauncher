@@ -73,8 +73,8 @@ describe("apiHost", () => {
   it("recognises our hosts by origin and refuses everything else", () => {
     expect(apiBaseOf(`${BACKEND_URL}/modpacks`)).toBe(BACKEND_URL);
     expect(apiBaseOf(`${BACKEND_URL_DIRECT}/health`)).toBe(BACKEND_URL_DIRECT);
-    expect(apiBaseOf("https://api.relaxinglauncher.com.evil.com/x")).toBeNull();
-    expect(apiBaseOf("https://cdn.relaxinglauncher.com/x")).toBeNull();
+    expect(apiBaseOf("https://api.grubielauncher.com.evil.com/x")).toBeNull();
+    expect(apiBaseOf("https://cdn.grubielauncher.com/x")).toBeNull();
     expect(apiBaseOf("/modpacks")).toBeNull();
     expect(apiBaseOf("")).toBeNull();
   });
@@ -350,7 +350,7 @@ describe("a machine that is offline entirely", () => {
         url.startsWith("http") ? url : String(config.baseURL) + url,
       );
       hits.push(target.origin);
-      const error = new Error(`getaddrinfo ${code} api.relaxinglauncher.com`) as Error & {
+      const error = new Error(`getaddrinfo ${code} api.grubielauncher.com`) as Error & {
         code: string;
         isAxiosError: boolean;
         config: unknown;

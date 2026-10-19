@@ -3,9 +3,9 @@ import net from 'net'
 export const SHARE_STREAM_FRAME_VERSION = 1
 export const SHARE_STREAM_FRAME_TYPE_DATA = 1
 export const SHARE_WS_PATH = '/ws'
-export const SHARE_TUNNEL_URL = 'wss://tunnel.relaxinglauncher.com/ws'
+export const SHARE_TUNNEL_URL = 'wss://tunnel.grubielauncher.com/ws'
 export const SHARE_HANDSHAKE_PROTOCOL_VERSION = 2
-export const SHARE_GATEWAY_HOST_SUFFIX = 'relaxinglauncher.com'
+export const SHARE_GATEWAY_HOST_SUFFIX = 'grubielauncher.com'
 export const MAX_INITIAL_DATA_BASE64_LENGTH = 64 * 1024
 const GUEST_USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 const GUEST_USERNAME_PATTERN = /^[\x21-\x7E]{1,16}$/
@@ -265,11 +265,11 @@ export function isValidShareSlug(slug: string): boolean {
 }
 
 export function isValidPublicShareHost(host: string): boolean {
-  return new RegExp(`^(?!jt-[a-z0-9]+--)[a-z0-9-]{3,48}\\.join\\.relaxinglauncher\\.com$`).test(host)
+  return new RegExp(`^(?!jt-[a-z0-9]+--)[a-z0-9-]{3,48}\\.join\\.grubielauncher\\.com$`).test(host)
 }
 
 export function isValidTicketShareHost(host: string): boolean {
-  return new RegExp(`^jt-[a-z0-9]+--[a-z0-9-]{3,48}\\.join\\.relaxinglauncher\\.com$`).test(host)
+  return new RegExp(`^jt-[a-z0-9]+--[a-z0-9-]{3,48}\\.join\\.grubielauncher\\.com$`).test(host)
 }
 
 export function normalizeGatewayUrl(gatewayUrl: string): string {

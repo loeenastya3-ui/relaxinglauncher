@@ -182,14 +182,14 @@ describe("parseRunScript", () => {
   it("keeps the authlib agent out of a run.sh only when it is the launcher's own", () => {
     const script = [
       "#!/bin/sh",
-      `'/opt/java/bin/java' -javaagent:"libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar"=relaxinglauncher.com -javaagent:"libraries/evil.jar"=evil.com -Xmx2048M -jar quilt.jar nogui "$@"`,
+      `'/opt/java/bin/java' -javaagent:"libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar"=grubielauncher.com -javaagent:"libraries/evil.jar"=evil.com -Xmx2048M -jar quilt.jar nogui "$@"`,
       `read -p "Press [Enter] key to continue..."`,
     ].join("\n");
 
     expect(parseRunScript(script, true)).toEqual({
       command: "/opt/java/bin/java",
       args: [
-        "-javaagent:libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar=relaxinglauncher.com",
+        "-javaagent:libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar=grubielauncher.com",
         "-Xmx2048M",
         "-jar",
         "quilt.jar",
@@ -231,7 +231,7 @@ describe("isLoaderManagedJvmArgument", () => {
       "-javaagent:libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar=ely.by",
       "-javaagent:libraries/com/GitHub/YuShijinhun/Authlib-Injector/1.2.7/Authlib-Injector-1.2.7.JAR=ely.by",
       "-javaagent:LIBRARIES/authlib-injector-1.2.7.Jar=Ely.By",
-      "-javaagent:libraries/authlib-injector-1.2.7.jar=RelaxingLauncher.COM",
+      "-javaagent:libraries/authlib-injector-1.2.7.jar=grubielauncher.com",
     ]) {
       expect(isLoaderManagedJvmArgument(token)).toBe(true);
     }
@@ -242,7 +242,7 @@ describe("isLoaderManagedJvmArgument", () => {
       "-javaagent:libraries/authlib-injector-1.2.7.jar=ely.by.evil.com",
       "-javaagent:libraries/authlib-injector-1.2.7.JAR=ELY.BY.EVIL.COM",
       "-javaagent:libraries/authlib-injector-1.2.7.jar=evil.ely.by",
-      "-javaagent:libraries/authlib-injector-1.2.7.jar=relaxinglauncher.com.evil.com",
+      "-javaagent:libraries/authlib-injector-1.2.7.jar=grubielauncher.com.evil.com",
       "-javaagent:libraries/../evil.jar=ely.by",
       "-javaagent:LIBRARIES/../evil.JAR=ELY.BY",
       "-javaagent:mods/evil.jar=ely.by",
@@ -340,7 +340,7 @@ describe("filterArgfileTokens", () => {
 
   it("keeps the authlib agent the launcher writes into user_jvm_args.txt", () => {
     const line =
-      '-Dhttp.agent=Mozilla/5.0 -javaagent:"libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar"=relaxinglauncher.com -Xmx4096M';
+      '-Dhttp.agent=Mozilla/5.0 -javaagent:"libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar"=grubielauncher.com -Xmx4096M';
 
     const { safe, rejected } = filterArgfileTokens(
       tokenizeArgfileContent(line),
@@ -349,7 +349,7 @@ describe("filterArgfileTokens", () => {
     expect(rejected).toEqual([]);
     expect(safe).toEqual([
       "-Dhttp.agent=Mozilla/5.0",
-      "-javaagent:libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar=relaxinglauncher.com",
+      "-javaagent:libraries/com/github/yushijinhun/authlib-injector/1.2.7/authlib-injector-1.2.7.jar=grubielauncher.com",
       "-Xmx4096M",
     ]);
   });
@@ -364,7 +364,7 @@ describe("filterArgfileTokens", () => {
   it("drops jvm arguments injected into a loader argfile", () => {
     const tampered = [
       "-javaagent:payload.jar",
-      "-javaagent:C:/payload/evil.jar=relaxinglauncher.com",
+      "-javaagent:C:/payload/evil.jar=grubielauncher.com",
       "-agentpath:C:/payload/evil.dll",
       "-agentlib:evil",
       "-XX:VMOptionsFile=opts.txt",

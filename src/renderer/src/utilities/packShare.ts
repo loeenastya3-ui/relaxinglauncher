@@ -1,4 +1,4 @@
-const PACK_SHARE_BASE_URL = "https://relaxinglauncher.com/pack";
+const PACK_SHARE_BASE_URL = "https://grubielauncher.com/pack";
 const PACK_CODE_PATTERN = /^[a-fA-F0-9]{24}$/;
 const GROUP_CODE_PATTERN = /^[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}$/;
 
@@ -17,7 +17,7 @@ export function parsePackShareCode(input: string) {
     const url = new URL(value);
     const isPublicPackUrl =
       (url.protocol === "https:" || url.protocol === "http:") &&
-      url.hostname.replace(/^www\./, "") === "relaxinglauncher.com";
+      url.hostname.replace(/^www\./, "") === "grubielauncher.com";
     const isProtocolPackUrl = url.protocol === "relaxinglauncher:";
 
     if (isPublicPackUrl) {

@@ -21,8 +21,8 @@ describe("resolveLocalImage", () => {
 
   it("keeps remote and data urls untouched", () => {
     stubProtocol("app:");
-    expect(resolveLocalImage("https://cdn.relaxinglauncher.com/x.png")).toBe(
-      "https://cdn.relaxinglauncher.com/x.png",
+    expect(resolveLocalImage("https://cdn.grubielauncher.com/x.png")).toBe(
+      "https://cdn.grubielauncher.com/x.png",
     );
     expect(resolveLocalImage("data:image/png;base64,AAA")).toBe(
       "data:image/png;base64,AAA",

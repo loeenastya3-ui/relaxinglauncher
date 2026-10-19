@@ -28,7 +28,7 @@ import { reportFailure } from '../utilities/failureBus'
 
 const URL = 'https://api.modrinth.com/v2'
 const V3_URL = 'https://api.modrinth.com/v3'
-const CONTACT = 'https://relaxinglauncher.com'
+const CONTACT = 'https://grubielauncher.com'
 
 function buildUserAgent(): string {
   let version = '0.0.0'

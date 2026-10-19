@@ -26,7 +26,7 @@ const activeRuns = new Map<string, AbortController>();
 function buildHeaders(apiKey: string): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://relaxinglauncher.com",
+    "HTTP-Referer": "https://grubielauncher.com",
     "X-Title": "Relaxing Launcher",
   };
 

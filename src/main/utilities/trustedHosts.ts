@@ -9,7 +9,7 @@ const TRUSTED_DOWNLOAD_HOST_SUFFIXES = [
   "glass-launcher.net",
   "ornithemc.net",
   "betterthanadventure.net",
-  "relaxinglauncher.com",
+  "grubielauncher.com",
 ] as const;
 
 export function isTrustedDownloadUrl(url: unknown): url is string {

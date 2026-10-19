@@ -63,7 +63,7 @@ function buildChecks(): ConnectivityCheck[] {
     name: 'RelaxingLauncher CDN',
     group: 'relaxing',
     kind: 'http',
-    url: 'https://cdn.relaxinglauncher.com/robots.txt',
+    url: 'https://cdn.grubielauncher.com/robots.txt',
     okStatus: isSuccess
   },
   {
@@ -71,7 +71,7 @@ function buildChecks(): ConnectivityCheck[] {
     name: 'RelaxingLauncher Tunnel',
     group: 'relaxing',
     kind: 'http',
-    url: 'https://tunnel.relaxinglauncher.com/healthz',
+    url: 'https://tunnel.grubielauncher.com/healthz',
     okStatus: isSuccess
   },
   {
@@ -79,7 +79,7 @@ function buildChecks(): ConnectivityCheck[] {
     name: 'RelaxingLauncher Join (25565)',
     group: 'relaxing',
     kind: 'tcp',
-    host: 'connectivity-test.join.relaxinglauncher.com',
+    host: 'connectivity-test.join.grubielauncher.com',
     port: 25565
   },
   {
@@ -127,7 +127,7 @@ function buildChecks(): ConnectivityCheck[] {
     name: 'RelaxingLauncher Mirror',
     group: 'mirror',
     kind: 'http',
-    url: 'https://mirror.relaxinglauncher.com/healthz',
+    url: 'https://mirror.grubielauncher.com/healthz',
     okStatus: isSuccess
   },
   {
@@ -135,7 +135,7 @@ function buildChecks(): ConnectivityCheck[] {
     name: 'Mirror → Mojang Meta',
     group: 'mirror',
     kind: 'http',
-    url: 'https://mirror.relaxinglauncher.com/piston-meta/mc/game/version_manifest_v2.json',
+    url: 'https://mirror.grubielauncher.com/piston-meta/mc/game/version_manifest_v2.json',
     okStatus: isSuccess,
     minBytes: PAYLOAD_MIN_BYTES
   },

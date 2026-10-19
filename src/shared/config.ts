@@ -1,10 +1,10 @@
-export const BACKEND_URL = "https://api.relaxinglauncher.com";
-export const BACKEND_URL_DIRECT = "https://direct.relaxinglauncher.com";
+export const BACKEND_URL = "https://api.grubielauncher.com";
+export const BACKEND_URL_DIRECT = "https://direct.grubielauncher.com";
 export const BACKEND_CANDIDATES = [BACKEND_URL, BACKEND_URL_DIRECT] as const;
-export const SITE_URL = "https://relaxinglauncher.com";
-export const STATUS_URL = "https://status.relaxinglauncher.com";
+export const SITE_URL = "https://grubielauncher.com";
+export const STATUS_URL = "https://status.grubielauncher.com";
 export const MICROSOFT_CLIENT_ID = "cc9b4083-d837-4bec-a167-46ad95d24b39";
-export const ELYBY_CLIENT_ID = "relaxing-launcher";
+export const ELYBY_CLIENT_ID = "grubie-launcher";
 export const DISCORD_CLIENT_ID = "1239239239946735666";
 export const AI_PROMPT_MAX_CHARS = 20000;
 export const NEWS_PAGE_SIZE = 20;

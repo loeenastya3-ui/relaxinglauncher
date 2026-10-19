@@ -15,7 +15,7 @@ describe("launcher deep links", () => {
 
   it("ignores invalid scheme, path and code", () => {
     expect(
-      parseLauncherDeepLink("https://relaxinglauncher.com/pack/507f"),
+      parseLauncherDeepLink("https://grubielauncher.com/pack/507f"),
     ).toBeNull();
     expect(
       parseLauncherDeepLink(

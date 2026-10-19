@@ -8,7 +8,7 @@ describe("share upload helpers", () => {
   it("extracts modpack id from public storage URLs", () => {
     expect(
       getRemoteModpackId(
-        "https://cdn.relaxinglauncher.com/modpacks/old-pack/shaderpacks/file.zip",
+        "https://cdn.grubielauncher.com/modpacks/old-pack/shaderpacks/file.zip",
       ),
     ).toBe("old-pack");
     expect(
@@ -23,7 +23,7 @@ describe("share upload helpers", () => {
       shouldUploadLocalShareFile(
         {
           filename: "shader.txt",
-          url: "https://cdn.relaxinglauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
+          url: "https://cdn.grubielauncher.com/modpacks/old-pack/shaderpacks/shader.txt",
           sha1: "",
           size: 0,
           isServer: false,
@@ -38,7 +38,7 @@ describe("share upload helpers", () => {
       shouldUploadLocalShareFile(
         {
           filename: "shader.txt",
-          url: "https://cdn.relaxinglauncher.com/modpacks/current-pack/shaderpacks/shader.txt",
+          url: "https://cdn.grubielauncher.com/modpacks/current-pack/shaderpacks/shader.txt",
           sha1: "",
           size: 0,
           isServer: false,

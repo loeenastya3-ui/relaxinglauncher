@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://relaxinglauncher.com/">relaxinglauncher.com</a>
+  <a href="https://grubielauncher.com/">grubielauncher.com</a>
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@ The interface is a permanent sidebar with full screens instead of stacked dialog
 - Import from a file: Relaxing, CurseForge, Modrinth (`.mrpack`), Prism and MultiMC packs — drag the archive onto the window.
 - Export an instance to an archive; the copy carries mods, configs and worlds.
 - Publish an instance and share the code: everyone who installed it sees your next update, with a diff of what changes, and syncs it in one click.
-- Community catalog of public instances, both inside the launcher and on [relaxinglauncher.com/packs](https://relaxinglauncher.com/packs).
+- Community catalog of public instances, both inside the launcher and on [grubielauncher.com/packs](https://grubielauncher.com/packs).
 - Integrity check that re-downloads damaged or missing files.
 - Config editor with search, completion and saved versions to roll back to.
 - Chunk editor for worlds: a map of every generated chunk per dimension with a satellite view of the terrain, filters for never-visited, outdated or damaged chunks, and deletion with a safety backup taken first.
@@ -124,8 +124,8 @@ The launcher updates itself; new versions arrive without a re-install.
 
 # Links
 
-- **Website:** [relaxinglauncher.com](https://relaxinglauncher.com/)
+- **Website:** [grubielauncher.com](https://grubielauncher.com/)
 - **Downloads:** [Releases](https://github.com/loeenastya3-ui/relaxinglauncher/releases)
-- **Changelog:** [relaxinglauncher.com/changelog](https://relaxinglauncher.com/changelog)
+- **Changelog:** [grubielauncher.com/changelog](https://grubielauncher.com/changelog)
 - **Discord:** [Relaxing Launcher server](https://discord.com/invite/URrKha9hk7)
-- **Privacy Policy:** [relaxinglauncher.com/privacy](https://relaxinglauncher.com/privacy)
+- **Privacy Policy:** [grubielauncher.com/privacy](https://grubielauncher.com/privacy)

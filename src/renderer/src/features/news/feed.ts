@@ -37,7 +37,7 @@ export interface NewsSplit {
 export const SECONDARY_SLOTS = 3;
 
 const MINECRAFT_HOSTS = ["minecraft.net", "mojang.com"];
-const RELAXING_HOSTS = ["relaxinglauncher.com"];
+const RELAXING_HOSTS = ["grubielauncher.com"];
 
 export function newsHost(url: string): string {
   try {

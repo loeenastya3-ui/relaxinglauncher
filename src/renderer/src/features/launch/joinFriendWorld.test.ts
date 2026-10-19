@@ -7,7 +7,7 @@ const syncShareMock = vi.fn();
 const checkBlockedModsMock = vi.fn();
 const connectToFriendShare = vi.fn(async () => ({
   ok: true,
-  data: { connectHost: "share.relaxinglauncher.com:25565" },
+  data: { connectHost: "share.grubielauncher.com:25565" },
 }));
 const serversWrite = vi.fn(async () => true);
 const showFailureToastMock = vi.fn();
@@ -205,7 +205,7 @@ describe("joinFriendWorld with blocked mods", () => {
     expect(runGameMock).toHaveBeenCalledTimes(1);
     expect(runGameMock.mock.calls[0]?.[0]).toMatchObject({
       version: friendPack,
-      quick: { multiplayer: "share.relaxinglauncher.com:25565" },
+      quick: { multiplayer: "share.grubielauncher.com:25565" },
     });
   });
 

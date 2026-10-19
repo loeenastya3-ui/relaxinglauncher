@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const NOTES_DIR = path.join(ROOT, "release-notes");
 const REPO = process.env.GITHUB_REPOSITORY || "loeenastya3-ui/relaxinglauncher";
-const API_URL = (process.env.RELAXING_API_URL || "https://api.relaxinglauncher.com").replace(/\/+$/, "");
+const API_URL = (process.env.RELAXING_API_URL || "https://api.grubielauncher.com").replace(/\/+$/, "");
 
 const GUILD_ID = "1229487451916210236";
 const BUG_REPORTS_CHANNEL = "1463718142533566588";

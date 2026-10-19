@@ -158,7 +158,7 @@ describe("launchStallHint", () => {
       launchStallHint(
         stall(0, [
           "[authlib-injector] [INFO] Version: 1.2.8",
-          "[authlib-injector] [INFO] Authentication server: https://relaxinglauncher.com",
+          "[authlib-injector] [INFO] Authentication server: https://grubielauncher.com",
         ]),
       ),
     ).toBe("auth");

@@ -139,7 +139,7 @@ export function startOAuthServer(expectedState: string): Promise<{
         }
 
         if (!code) {
-          redirect(res, "https://relaxinglauncher.com/auth/failed");
+          redirect(res, "https://grubielauncher.com/auth/failed");
           await closeServer();
           return safeReject(new Error("Invalid request. Missing code."));
         }
@@ -149,7 +149,7 @@ export function startOAuthServer(expectedState: string): Promise<{
           provider: expectedProvider,
         });
 
-        redirect(res, "https://relaxinglauncher.com/auth/success");
+        redirect(res, "https://grubielauncher.com/auth/success");
         void closeServer();
       };
 

@@ -69,7 +69,7 @@ linux:
   target:
     - AppImage
     - deb
-  maintainer: relaxinglauncher.com
+  maintainer: grubielauncher.com
   category: Utility
   artifactName: ${name}-${version}.${ext}
   desktop:

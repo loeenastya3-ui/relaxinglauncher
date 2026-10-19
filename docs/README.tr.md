@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://relaxinglauncher.com/tr">relaxinglauncher.com</a>
+  <a href="https://grubielauncher.com/tr">grubielauncher.com</a>
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@ Arayüz, üst üste açılan pencereler yerine sabit bir kenar çubuğundan ve t
 - Dosyadan içe aktarma: Relaxing, CurseForge, Modrinth (`.mrpack`), Prism ve MultiMC paketleri — arşivi pencereye sürüklemeniz yeterli.
 - Bir kurulumu arşive dışa aktarma; kopya modları, yapılandırmaları ve dünyaları taşır.
 - Bir kurulumu yayımlayın ve kodu paylaşın: Onu kuran herkes bir sonraki güncellemenizi değişikliklerin farkıyla görür ve tek tıkla eşitler.
-- Herkese açık kurulumların topluluk kataloğu, başlatıcının içinde ve [relaxinglauncher.com/packs](https://relaxinglauncher.com/tr/packs) adresinde.
+- Herkese açık kurulumların topluluk kataloğu, başlatıcının içinde ve [grubielauncher.com/packs](https://grubielauncher.com/tr/packs) adresinde.
 - Hasarlı veya eksik dosyaları yeniden indiren bütünlük denetimi.
 - Arama, otomatik tamamlama ve geri dönmek için kayıtlı sürümlerle yapılandırma düzenleyicisi.
 - Dünyalar için yığın düzenleyicisi: her boyutta oluşturulmuş tüm yığınları araziyi uydu görünümüyle gösteren harita, hiç ziyaret edilmemiş, eski veya hasarlı yığınlar için filtreler ve önce güvenlik yedeği alınarak silme.
@@ -124,8 +124,8 @@ Başlatıcı kendini günceller; yeni sürümler yeniden yükleme gerekmeden gel
 
 # Bağlantılar
 
-- **Web sitesi:** [relaxinglauncher.com](https://relaxinglauncher.com/tr)
+- **Web sitesi:** [grubielauncher.com](https://grubielauncher.com/tr)
 - **İndirmeler:** [Releases](https://github.com/loeenastya3-ui/relaxinglauncher/releases)
-- **Değişiklik günlüğü:** [relaxinglauncher.com/changelog](https://relaxinglauncher.com/tr/changelog)
+- **Değişiklik günlüğü:** [grubielauncher.com/changelog](https://grubielauncher.com/tr/changelog)
 - **Discord:** [Relaxing Launcher sunucusu](https://discord.com/invite/URrKha9hk7)
-- **Gizlilik politikası:** [relaxinglauncher.com/privacy](https://relaxinglauncher.com/tr/privacy)
+- **Gizlilik politikası:** [grubielauncher.com/privacy](https://grubielauncher.com/tr/privacy)

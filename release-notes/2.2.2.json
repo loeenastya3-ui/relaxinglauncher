@@ -1,0 +1,40 @@
+{
+  "version": "2.2.2",
+  "isMilestone": false,
+  "en": {
+    "subtitle": "Sign-in works again: Discord, Microsoft and Ely.by authorization live on working servers.",
+    "highlights": [
+      "Authorization with Discord, Microsoft and Ely.by works again — the launcher now talks to its always-on companion servers.",
+      "File downloads, skins CDN, public pack sharing and world tunnels use the same working hosts, so mods and packs fetch without errors.",
+      "The People catalog on GitHub stays as a fallback: it still explains what works when you are offline."
+    ],
+    "fixes": [
+      "The launcher no longer points at unreachable hosts, so the OAuth sign-in completes after you approve it in the browser.",
+      "Anti-virus hints and donate links now mention reachable domains."
+    ]
+  },
+  "ru": {
+    "subtitle": "Авторизация снова работает: вход через Discord, Microsoft и Ely.by на живых серверах.",
+    "highlights": [
+      "Вход через Discord, Microsoft и Ely.by снова работает — лаунчер обращается к постоянно доступным сервисам.",
+      "Скачивание файлов, CDN скинов, публичный обмен сборками и туннели миров используют те же живые адреса — моды и сборки тянутся без ошибок.",
+      "Каталог «Люди» на GitHub остаётся запасным: он по-прежнему объясняет, что доступно без сети."
+    ],
+    "fixes": [
+      "Лаунчер больше не обращается к недоступным адресам: после одобрения в браузере вход OAuth завершается успешно.",
+      "Подсказки для антивируса и ссылки на донат теперь ведут на рабочие домены."
+    ]
+  },
+  "uk": {
+    "subtitle": "Авторизація знову працює: вхід через Discord, Microsoft і Ely.by на живих серверах.",
+    "highlights": [
+      "Вхід через Discord, Microsoft і Ely.by знову працює — лаунчер звертається до постійно доступних сервісів.",
+      "Завантаження файлів, CDN скінів, публічний обмін збірками і тунелі світів використовують ті самі живі адреси — моди та збірки тягнуться без помилок.",
+      "Каталог «Люди» на GitHub залишається запасним: він досі пояснює, що доступно без мережі."
+    ],
+    "fixes": [
+      "Лаунчер більше не вказує на недоступні адреси: після схвалення в браузері вхід OAuth завершується успішно.",
+      "Підказки для антивіруса та посилання на донат тепер ведуть на робочі домени."
+    ]
+  }
+}

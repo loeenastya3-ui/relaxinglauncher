@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://relaxinglauncher.com/fr">relaxinglauncher.com</a>
+  <a href="https://grubielauncher.com/fr">grubielauncher.com</a>
 </p>
 
 <p align="center">
@@ -71,7 +71,7 @@ L’interface est une barre latérale permanente avec des écrans complets au li
 - Import depuis un fichier : packs Relaxing, CurseForge, Modrinth (`.mrpack`), Prism et MultiMC — glissez l’archive sur la fenêtre.
 - Export d’une instance dans une archive ; la copie contient les mods, les configs et les mondes.
 - Publiez une instance et partagez le code : tous ceux qui l’ont installée voient votre prochaine mise à jour, avec les différences, et la synchronisent en un clic.
-- Catalogue communautaire d’instances publiques, dans le launcher et sur [relaxinglauncher.com/packs](https://relaxinglauncher.com/fr/packs).
+- Catalogue communautaire d’instances publiques, dans le launcher et sur [grubielauncher.com/packs](https://grubielauncher.com/fr/packs).
 - Vérification de l’intégrité qui retélécharge les fichiers endommagés ou manquants.
 - Éditeur de configs avec recherche, complétion et versions enregistrées pour revenir en arrière.
 - Éditeur de chunks pour les mondes : une carte de tous les chunks générés par dimension avec vue satellite du terrain, des filtres pour les chunks jamais visités, obsolètes ou endommagés, et une suppression précédée d’une sauvegarde de sécurité.
@@ -124,8 +124,8 @@ Le launcher se met à jour tout seul ; les nouvelles versions arrivent sans ré
 
 # Liens
 
-- **Site web :** [relaxinglauncher.com](https://relaxinglauncher.com/fr)
+- **Site web :** [grubielauncher.com](https://grubielauncher.com/fr)
 - **Téléchargements :** [Releases](https://github.com/loeenastya3-ui/relaxinglauncher/releases)
-- **Journal des modifications :** [relaxinglauncher.com/changelog](https://relaxinglauncher.com/fr/changelog)
+- **Journal des modifications :** [grubielauncher.com/changelog](https://grubielauncher.com/fr/changelog)
 - **Discord :** [serveur Relaxing Launcher](https://discord.com/invite/URrKha9hk7)
-- **Politique de confidentialité :** [relaxinglauncher.com/privacy](https://relaxinglauncher.com/fr/privacy)
+- **Politique de confidentialité :** [grubielauncher.com/privacy](https://grubielauncher.com/fr/privacy)

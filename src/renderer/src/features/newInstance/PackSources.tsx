@@ -205,7 +205,7 @@ export function CodeSource({
             "h-9 flex-1 font-mono",
             redact.active && "streamer-mask",
           )}
-          placeholder="relaxinglauncher.com/pack/…"
+          placeholder="grubielauncher.com/pack/…"
           value={value}
           disabled={isBusy}
           spellCheck={false}
@@ -231,7 +231,7 @@ export function CodeSource({
         type="button"
         className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         onClick={() => {
-          void api.shell.openExternal("https://relaxinglauncher.com/packs");
+          void api.shell.openExternal("https://grubielauncher.com/packs");
         }}
       >
         <ExternalLink className="size-3" />

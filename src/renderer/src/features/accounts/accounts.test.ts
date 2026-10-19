@@ -132,7 +132,7 @@ describe("identity", () => {
   });
 
   it("builds head urls per provider and skips offline accounts", () => {
-    const base = "https://api.relaxinglauncher.com";
+    const base = "https://api.grubielauncher.com";
 
     expect(
       headImageUrl(
@@ -163,17 +163,17 @@ describe("identity", () => {
   it("appends a cache-busting version when asked", () => {
     const url = headImageUrl(
       account({ type: "elyby", nickname: "Kituk" }),
-      "https://api.relaxinglauncher.com",
+      "https://api.grubielauncher.com",
       7,
     );
 
     expect(url).toBe(
-      "https://api.relaxinglauncher.com/skins/head/elyby/Kituk?v=7",
+      "https://api.grubielauncher.com/skins/head/elyby/Kituk?v=7",
     );
   });
 
   it("prefers an explicit uuid over the one inside the token", () => {
-    const base = "https://api.relaxinglauncher.com";
+    const base = "https://api.grubielauncher.com";
 
     expect(
       headImageUrl(

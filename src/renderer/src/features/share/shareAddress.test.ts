@@ -9,20 +9,20 @@ describe("parseShareAddress", () => {
   });
 
   it("splits the session handle from the domain", () => {
-    const info = parseShareAddress("bright-otter-42.join.relaxinglauncher.com");
+    const info = parseShareAddress("bright-otter-42.join.grubielauncher.com");
     expect(info).toEqual({
-      raw: "bright-otter-42.join.relaxinglauncher.com",
+      raw: "bright-otter-42.join.grubielauncher.com",
       handle: "bright-otter-42",
-      domain: "join.relaxinglauncher.com",
-      masked: "••••••.join.relaxinglauncher.com",
+      domain: "join.grubielauncher.com",
+      masked: "••••••.join.grubielauncher.com",
     });
   });
 
   it("strips scheme, port and trailing slashes", () => {
-    const info = parseShareAddress("tcp://slug.join.relaxinglauncher.com:25565/");
-    expect(info?.raw).toBe("slug.join.relaxinglauncher.com:25565");
+    const info = parseShareAddress("tcp://slug.join.grubielauncher.com:25565/");
+    expect(info?.raw).toBe("slug.join.grubielauncher.com:25565");
     expect(info?.handle).toBe("slug");
-    expect(info?.domain).toBe("join.relaxinglauncher.com");
+    expect(info?.domain).toBe("join.grubielauncher.com");
   });
 
   it("masks a hostname without a domain part", () => {
@@ -33,10 +33,10 @@ describe("parseShareAddress", () => {
 
 describe("isShareAddressUsable", () => {
   it("is usable only for a public session", () => {
-    expect(isShareAddressUsable("a.join.relaxinglauncher.com", "public")).toBe(
+    expect(isShareAddressUsable("a.join.grubielauncher.com", "public")).toBe(
       true,
     );
-    expect(isShareAddressUsable("a.join.relaxinglauncher.com", "friends")).toBe(
+    expect(isShareAddressUsable("a.join.grubielauncher.com", "friends")).toBe(
       false,
     );
     expect(isShareAddressUsable("", "public")).toBe(false);

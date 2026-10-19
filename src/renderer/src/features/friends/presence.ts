@@ -17,7 +17,7 @@ export interface FriendPresence {
   lastActiveAt: number;
 }
 
-const HOSTED_SHARE_HOST = "join.relaxinglauncher.com";
+const HOSTED_SHARE_HOST = "join.grubielauncher.com";
 
 export function friendLastActiveAt(friend: IFriend): number {
   const value = new Date(friend.user.lastActive).getTime();

@@ -27,7 +27,7 @@ const ROUTES = [
     mirrored: true,
   },
   { id: "mods", host: "cdn.modrinth.com · forgecdn.net", mirrored: true },
-  { id: "account", host: "api.relaxinglauncher.com", mirrored: false },
+  { id: "account", host: "api.grubielauncher.com", mirrored: false },
 ] as const;
 
 const MODE_TONE: Record<MirrorMode, string> = {

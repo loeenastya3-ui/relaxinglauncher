@@ -17,7 +17,7 @@ function axiosError(status: number, url: string) {
 describe("classifyError", () => {
   it("maps backend http errors to the relaxing side", () => {
     const info = classifyError(
-      axiosError(503, "https://api.relaxinglauncher.com/modpacks/abc"),
+      axiosError(503, "https://api.grubielauncher.com/modpacks/abc"),
     );
 
     expect(info.side).toBe("relaxing");
@@ -29,7 +29,7 @@ describe("classifyError", () => {
   it("keeps the reason the backend sent with a rejected request", () => {
     const error = axiosError(
       409,
-      "https://api.relaxinglauncher.com/modpacks",
+      "https://api.grubielauncher.com/modpacks",
     ) as any;
     error.response.data = {
       statusCode: 409,
@@ -45,7 +45,7 @@ describe("classifyError", () => {
   });
 
   it("ignores an html error page as a reason", () => {
-    const error = axiosError(502, "https://api.relaxinglauncher.com/modpacks") as any;
+    const error = axiosError(502, "https://api.grubielauncher.com/modpacks") as any;
     error.response.data = "<html><body>502 Bad Gateway</body></html>";
 
     const info = classifyError(error);

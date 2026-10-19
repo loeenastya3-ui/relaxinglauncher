@@ -39,10 +39,10 @@ describe("toMirrorUrl", () => {
 
   it("maps our own storage to /storage/, the one origin a build cannot do without", () => {
     expect(
-      toMirrorUrl("https://cdn.relaxinglauncher.com/modpacks/abc/pack.zip"),
+      toMirrorUrl("https://cdn.grubielauncher.com/modpacks/abc/pack.zip"),
     ).toBe(`${MIRROR_BASE}/storage/modpacks/abc/pack.zip`);
     expect(
-      toMirrorUrl("https://cdn.relaxinglauncher.com/avatars/x.png", MIRROR_BASE_DIRECT),
+      toMirrorUrl("https://cdn.grubielauncher.com/avatars/x.png", MIRROR_BASE_DIRECT),
     ).toBe(`${MIRROR_BASE_DIRECT}/storage/avatars/x.png`);
   });
 

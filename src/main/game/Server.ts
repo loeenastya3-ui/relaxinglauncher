@@ -152,7 +152,7 @@ const ARGFILE_MAIN_CLASS =
   /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+$/;
 const ARGFILE_AUTHLIB_AGENT_PREFIX = "-javaagent:";
 const ARGFILE_AUTHLIB_AGENT_BODY =
-  /^libraries\/[A-Za-z0-9._+-]+(?:\/[A-Za-z0-9._+-]+)*\.jar=(?:ely\.by|relaxinglauncher\.com)$/i;
+  /^libraries\/[A-Za-z0-9._+-]+(?:\/[A-Za-z0-9._+-]+)*\.jar=(?:ely\.by|grubielauncher\.com)$/i;
 
 const SERVER_LOG_LINES = 300;
 const SERVER_OUTPUT_FLUSH_MS = 200;

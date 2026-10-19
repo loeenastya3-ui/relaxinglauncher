@@ -325,7 +325,7 @@
   },
   "webLogin": {
     "title": "Entrar no site",
-    "bodyNoName": "Permitir o login no relaxinglauncher.com?",
+    "bodyNoName": "Permitir o login no grubielauncher.com?",
     "hint": "Só aprove se foi você mesmo quem iniciou isso no site.",
     "codeLabel": "Código de confirmação",
     "codeHint": "Só permita o login se o site mostrar o mesmo código.",
@@ -983,7 +983,7 @@
     },
     "help": {
       "fromServer": {
-        "1": "O código do pacote é o final de um link relaxinglauncher.com/pack/… — o próprio link também funciona.",
+        "1": "O código do pacote é o final de um link grubielauncher.com/pack/… — o próprio link também funciona.",
         "2": "O launcher baixa exatamente os mesmos mods, configs e servidores que o autor tem.",
         "3": "Quando o autor atualizar o pacote, você recebe um aviso e pode sincronizar."
       },
@@ -5468,7 +5468,7 @@
     "title": "{{version}} está demorando demais para iniciar",
     "silent": "O processo do jogo não escreve nada há muito tempo. Envie um relatório — ele mostra onde a inicialização parou.",
     "quiet": "O jogo parou de escrever no log. Envie um relatório — ele mostra onde a inicialização parou.",
-    "auth": "O jogo parou no login, antes de o Minecraft iniciar. Geralmente a causa é uma VPN, um proxy, uma ferramenta para contornar DPI (Zapret, GoodbyeDPI) ou um antivírus: desative-os enquanto joga ou adicione relaxinglauncher.com e javaw.exe às exclusões deles. Se não ajudar, envie um relatório.",
+    "auth": "O jogo parou no login, antes de o Minecraft iniciar. Geralmente a causa é uma VPN, um proxy, uma ferramenta para contornar DPI (Zapret, GoodbyeDPI) ou um antivírus: desative-os enquanto joga ou adicione grubielauncher.com e javaw.exe às exclusões deles. Se não ajudar, envie um relatório.",
     "report": "Enviar relatório"
   },
   "jarMods": {
