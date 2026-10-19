@@ -1,0 +1,37 @@
+{
+  "version": "2.2.1",
+  "isMilestone": false,
+  "en": {
+    "subtitle": "People and profiles work without a live server, powered by community data on GitHub.",
+    "highlights": [
+      "The People page now shows a member catalog that is assembled on GitHub, so it opens even without Relaxing's live services.",
+      "Public profiles of catalog members open from GitHub-hosted data, with a button to jump to a profile right from the catalog.",
+      "Your own profile now opens even if you play without an online account: it is built from your local account data."
+    ],
+    "fixes": [
+      "The People page no longer shows a misleading 'session expired' message when no live services are running; it explains what works offline instead."
+    ]
+  },
+  "ru": {
+    "subtitle": "Люди и профиль работают без живого сервера — на данных сообщества с GitHub.",
+    "highlights": [
+      "Страница «Люди» показывает каталог участников, который собирается на GitHub: он открывается даже без живых сервисов Relaxing.",
+      "Публичные профили участников каталога открываются из данных на GitHub, прямо из каталога появилась кнопка перехода в профиль.",
+      "Свой профиль теперь открывается даже без онлайн-аккаунта: он собирается из данных вашего локального аккаунта."
+    ],
+    "fixes": [
+      "Страница «Люди» больше не показывает ложное «сессия истекла», когда живые сервисы ещё не запущены, а объясняет, что работает без сервера."
+    ]
+  },
+  "uk": {
+    "subtitle": "Люди та профіль працюють без живого сервера — на даних спільноти з GitHub.",
+    "highlights": [
+      "Сторінка «Люди» показує каталог учасників, що збирається на GitHub: він відкривається навіть без живих сервісів Relaxing.",
+      "Публічні профілі учасників каталогу відкриваються з даних на GitHub, з каталогу з'явилася кнопка переходу в профіль.",
+      "Свій профіль тепер відкривається навіть без онлайн-акаунта: він збирається з даних вашого локального акаунта."
+    ],
+    "fixes": [
+      "Сторінка «Люди» більше не показує хибне «сесія минула», коли живі сервіси ще не запущені, а пояснює, що працює без сервера."
+    ]
+  }
+}
